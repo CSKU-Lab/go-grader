@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/SornchaiTheDev/go-grader/models"
 	"github.com/SornchaiTheDev/go-grader/services"
 )
 
@@ -19,7 +20,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	output, err := isolateService.Run()
+	output, err := isolateService.Run(&models.Limit{
+		WallTime: 1,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
