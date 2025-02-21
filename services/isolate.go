@@ -12,15 +12,18 @@ import (
 )
 
 type isolateService struct {
-	ctx context.Context
+	ctx   context.Context
+	boxID string
 }
 
-func NewIsolateService(ctx context.Context) *isolateService {
-	return &isolateService{ctx: ctx}
+func NewIsolateService(ctx context.Context, boxID int) *isolateService {
+	_boxID := fmt.Sprintf("--box-id=%d", boxID)
+
+	return &isolateService{ctx: ctx, boxID: _boxID}
 }
 
 func (s *isolateService) execute(args ...string) error {
-	cmd := exec.CommandContext(s.ctx, "isolate", args...)
+	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{s.boxID}, args...)...)
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
 
@@ -41,6 +44,12 @@ func (s *isolateService) Init() error {
 
 func (s *isolateService) Cleanup() error {
 	err := s.execute("--cleanup")
+	return err
+}
+
+func (s *isolateService) Copy(path string) error {
+	cmd := exec.CommandContext(s.ctx, "cp", "-r", path, "/tmp/isolate/0/box/")
+	err := cmd.Run()
 	return err
 }
 

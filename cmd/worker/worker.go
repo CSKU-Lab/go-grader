@@ -11,7 +11,10 @@ import (
 
 func main() {
 	ctx := context.Background()
-	isolateService := services.NewIsolateService(ctx)
+
+	boxID := 0
+
+	isolateService := services.NewIsolateService(ctx, boxID)
 	defer isolateService.Cleanup()
 
 	fmt.Println("Starting worker...")
