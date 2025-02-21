@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os/exec"
 	"reflect"
 
@@ -12,18 +13,19 @@ import (
 )
 
 type isolateService struct {
-	ctx   context.Context
-	boxID string
+	ctx     context.Context
+	boxID   int
+	boxPath string
 }
 
 func NewIsolateService(ctx context.Context, boxID int) *isolateService {
-	_boxID := fmt.Sprintf("--box-id=%d", boxID)
-
-	return &isolateService{ctx: ctx, boxID: _boxID}
+	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", boxID)
+	return &isolateService{ctx: ctx, boxID: boxID, boxPath: boxPath}
 }
 
 func (s *isolateService) execute(args ...string) error {
-	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{s.boxID}, args...)...)
+	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
+	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
 
@@ -38,32 +40,50 @@ func (s *isolateService) execute(args ...string) error {
 }
 
 func (s *isolateService) Init() error {
+	log.Printf("Initializing sandbox (ID %d)...", s.boxID)
 	err := s.execute("--init")
 	return err
 }
 
 func (s *isolateService) Cleanup() error {
+	log.Printf("Cleaning up sandbox (ID %d)...", s.boxID)
 	err := s.execute("--cleanup")
 	return err
 }
 
-func (s *isolateService) Copy(path string) error {
-	cmd := exec.CommandContext(s.ctx, "cp", "-r", path, "/tmp/isolate/0/box/")
+func (s *isolateService) CreateFile(name string, content string) error {
+	log.Printf("Creating file %s...", name)
+	filePath := fmt.Sprintf("%s/%s", s.boxPath, name)
+	cmd := exec.CommandContext(s.ctx, "sh", "-c", fmt.Sprintf("echo %q > %q", content, filePath))
 	err := cmd.Run()
 	return err
 }
 
-func (s *isolateService) Run(limit *models.Limit) error {
+func (s *isolateService) Compile(code string, compilerPath string) error {
+	log.Println("Compiling code...")
+	args := []string{
+		"--run",
+		"--",
+		compilerPath,
+		"-o",
+		"/box/program",
+	}
+
+	err := s.execute(args...)
+	return err
+}
+
+func (s *isolateService) Run(programPath string, runnerCmd []string, limit *models.Limit) error {
+	log.Println("Running program...")
 	_limits := getLimitArgs(limit)
 
 	args := []string{
 		"--run",
 		"--",
-		"/usr/bin/python3",
-		"-c",
-		"import time; time.sleep(1)",
+		programPath,
 	}
 
+	args = append(args[:2], append(runnerCmd, args[2:]...)...)
 	args = append(_limits, args...)
 
 	err := s.execute(args...)
@@ -72,6 +92,10 @@ func (s *isolateService) Run(limit *models.Limit) error {
 }
 
 func getLimitArgs(limit *models.Limit) []string {
+	if limit == nil {
+		return []string{}
+	}
+
 	v := reflect.ValueOf(limit).Elem()
 	t := v.Type()
 

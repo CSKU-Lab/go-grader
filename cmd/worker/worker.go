@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/SornchaiTheDev/go-grader/models"
 	"github.com/SornchaiTheDev/go-grader/services"
 )
 
@@ -23,9 +22,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = isolateService.Run(&models.Limit{
-		WallTime: 0.5,
-	})
+	err = isolateService.CreateFile("main.py", "print('Hello, World!')")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = isolateService.Run("main.py", []string{"/usr/bin/python3"}, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
