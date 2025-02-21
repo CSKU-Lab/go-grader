@@ -59,17 +59,17 @@ func (s *isolateService) CreateFile(name string, content string) error {
 	return err
 }
 
-func (s *isolateService) Compile(code string, compilerPath string) error {
+func (s *isolateService) Compile(script []string) error {
 	log.Println("Compiling code...")
-	args := []string{
-		"--run",
-		"--",
-		compilerPath,
-		"-o",
-		"/box/program",
-	}
+	cmd := exec.CommandContext(s.ctx, "sh", append([]string{"-c"}, script...)...)
+	err := cmd.Run()
 
-	err := s.execute(args...)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stdout
+	log.Println(append([]string{"scripts : ", "sh", "-c"}, script...))
+	log.Println(stdout.String())
+
 	return err
 }
 

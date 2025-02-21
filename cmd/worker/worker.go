@@ -22,12 +22,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = isolateService.CreateFile("main.py", "print('Hello, World!')")
+	code := `#include <stdio.h>
+	int main() {
+	    printf("Hello, World!");
+	}
+	`
+
+	err = isolateService.CreateFile("main.c", code)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = isolateService.Run("main.py", []string{"/usr/bin/python3"}, nil)
+	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", boxID)
+	err = isolateService.Compile([]string{"cd", boxPath, "&&", "pwd"})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = isolateService.Run("./program", []string{}, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
