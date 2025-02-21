@@ -14,18 +14,16 @@ func main() {
 	isolateService := services.NewIsolateService(ctx)
 	defer isolateService.Cleanup()
 
-	fmt.Println("Startng worker...")
+	fmt.Println("Starting worker...")
 	err := isolateService.Init()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	output, err := isolateService.Run(&models.Limit{
-		WallTime: 1,
+	err = isolateService.Run(&models.Limit{
+		WallTime: 0.5,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	print("Stdout: ", output)
 }

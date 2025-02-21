@@ -1,7 +1,9 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"reflect"
@@ -17,22 +19,32 @@ func NewIsolateService(ctx context.Context) *isolateService {
 	return &isolateService{ctx: ctx}
 }
 
-func (s *isolateService) execute(args ...string) ([]byte, error) {
+func (s *isolateService) execute(args ...string) error {
 	cmd := exec.CommandContext(s.ctx, "isolate", args...)
-	return cmd.Output()
+	var stdOut bytes.Buffer
+	var stdErr bytes.Buffer
+
+	cmd.Stdout = &stdOut
+	cmd.Stderr = &stdErr
+
+	err := cmd.Run()
+	if err != nil {
+		return errors.New(stdErr.String())
+	}
+	return nil
 }
 
 func (s *isolateService) Init() error {
-	_, err := s.execute("--init")
+	err := s.execute("--init")
 	return err
 }
 
 func (s *isolateService) Cleanup() error {
-	_, err := s.execute("--cleanup")
+	err := s.execute("--cleanup")
 	return err
 }
 
-func (s *isolateService) Run(limit *models.Limit) (string, error) {
+func (s *isolateService) Run(limit *models.Limit) error {
 	_limits := getLimitArgs(limit)
 
 	args := []string{
@@ -40,14 +52,14 @@ func (s *isolateService) Run(limit *models.Limit) (string, error) {
 		"--",
 		"/usr/bin/python3",
 		"-c",
-		"import time; time.sleep(0.5)",
+		"import time; time.sleep(1)",
 	}
 
 	args = append(_limits, args...)
 
-	stdout, err := s.execute(args...)
+	err := s.execute(args...)
 
-	return string(stdout), err
+	return err
 }
 
 func getLimitArgs(limit *models.Limit) []string {
@@ -60,11 +72,11 @@ func getLimitArgs(limit *models.Limit) []string {
 		field := v.Field(i)
 		arg := t.Field(i).Tag.Get("arg")
 
-		if field.Kind() == reflect.Int {
-			if field.Int() == 0 {
+		if field.Kind() == reflect.Float32 {
+			if field.Float() == 0 {
 				continue
 			}
-			args = append(args, fmt.Sprintf("%s=%d", arg, field.Int()))
+			args = append(args, fmt.Sprintf("%s=%f", arg, field.Float()))
 		} else if field.Kind() == reflect.Bool {
 			if !field.Bool() {
 				continue
