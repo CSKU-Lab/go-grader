@@ -34,7 +34,7 @@ func (s *isolateService) execute(args ...string) error {
 
 	err := cmd.Run()
 	if err != nil {
-		return errors.New(stdErr.String())
+		return errors.New(err.Error() + " : " + stdErr.String())
 	}
 	return nil
 }
@@ -59,36 +59,41 @@ func (s *isolateService) CreateFile(name string, content string) error {
 	return err
 }
 
-func (s *isolateService) Compile(script []string) error {
-	log.Println("Compiling code...")
-	cmd := exec.CommandContext(s.ctx, "sh", append([]string{"-c"}, script...)...)
-	err := cmd.Run()
-
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stdout
-	log.Println(append([]string{"scripts : ", "sh", "-c"}, script...))
-	log.Println(stdout.String())
-
-	return err
-}
-
 func (s *isolateService) Run(programPath string, runnerCmd []string, limit *models.Limit) error {
 	log.Println("Running program...")
 	_limits := getLimitArgs(limit)
 
 	args := []string{
+		"--stdin=input",
+		"--stdout=output.txt",
 		"--run",
 		"--",
 		programPath,
 	}
 
-	args = append(args[:2], append(runnerCmd, args[2:]...)...)
+	args = append(args[:3], append(runnerCmd, args[3:]...)...)
 	args = append(_limits, args...)
 
 	err := s.execute(args...)
 
 	return err
+}
+
+func (s *isolateService) GetOutput() (string, error) {
+	log.Println("Getting output...")
+	var stdOut bytes.Buffer
+	var stdErr bytes.Buffer
+
+	cmd := exec.CommandContext(s.ctx, "cat", fmt.Sprintf("%s/output.txt", s.boxPath))
+	cmd.Stdout = &stdOut
+	cmd.Stderr = &stdErr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", errors.New(stdErr.String())
+	}
+
+	return stdOut.String(), nil
 }
 
 func getLimitArgs(limit *models.Limit) []string {
