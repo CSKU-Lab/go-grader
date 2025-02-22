@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"reflect"
 
+	"github.com/SornchaiTheDev/go-grader/constants"
 	"github.com/SornchaiTheDev/go-grader/models"
 )
 
@@ -36,7 +37,7 @@ type isolateInstance struct {
 
 func (s *IsolateService) New() *isolateInstance {
 	boxID := <-s.boxIds
-	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", boxID)
+	boxPath := fmt.Sprintf(constants.BOX_PATH, boxID)
 	metadataPath := fmt.Sprintf("/tmp/box_%d_metadata", boxID)
 
 	instance := isolateInstance{
