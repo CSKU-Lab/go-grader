@@ -36,15 +36,15 @@
 			"name": "Java",
 			"version": "Java 17",
 			"sandbox_files": [
-				"Main.java"
+				"HelloWorld.java"
 			],
 			"compile_script": [
 				"javac",
-				"$file_path"
+				"$sandbox_path/HelloWorld.java"
 			],
 			"run_script": [
-				"java",
-				"Main"
+				"/usr/lib/jvm/java-1.17.0-openjdk-amd64/bin/java",
+				"HelloWorld"
 			]
 		},
 		{
@@ -54,9 +54,11 @@
 				"main.go"
 			],
 			"compile_script": [
-				"go",
+				"/usr/bin/go",
 				"build",
-				"$file_path"
+				"-o",
+				"main",
+				"$sandbox_path/main.go"
 			],
 			"run_script": [
 				"./main"
@@ -66,10 +68,10 @@
 			"name": "Python",
 			"version": "3.8",
 			"sandbox_files": [
-				"main.go"
+				"main.py"
 			],
 			"run_script": [
-				"python",
+				"/usr/bin/python3",
 				"main.py"
 			]
 		}
