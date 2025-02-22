@@ -105,7 +105,9 @@ func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput 
 
 	args := []string{
 		"--meta=" + i.metadataPath,
-		"--stdout=output.txt",
+		"--processes=100",
+		"--stdout=stdout",
+		"--stderr=stderr",
 		"--run",
 		"--",
 	}
@@ -123,11 +125,21 @@ func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput 
 }
 
 func (i *isolateInstance) GetOutput() (string, error) {
-	i.log("Getting output...")
+	i.log("Getting stdout...")
+	return i.catFile("stdout")
+}
+
+func (i *isolateInstance) GetError() (string, error) {
+	i.log("Getting stderror...")
+	return i.catFile("stderr")
+}
+
+func (i *isolateInstance) catFile(fileName string) (string, error) {
+
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
 
-	cmd := exec.CommandContext(i.ctx, "cat", fmt.Sprintf("%s/output.txt", i.boxPath))
+	cmd := exec.CommandContext(i.ctx, "cat", fmt.Sprintf("%s/%s", i.boxPath, fileName))
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 

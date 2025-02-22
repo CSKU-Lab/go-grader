@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
-	"github.com/SornchaiTheDev/go-grader/models"
+	"github.com/SornchaiTheDev/go-grader/responses"
 	"github.com/SornchaiTheDev/go-grader/services"
 )
 
@@ -26,7 +28,6 @@ func main() {
 	// go runner(isolateService, compileService, languageService)
 	// wg.Add(1)
 	// go runner(isolateService, compileService, languageService)
-
 	wg.Wait()
 	log.Println("All done")
 }
@@ -37,18 +38,14 @@ func runner(isolateService *services.IsolateService, compileService *services.Co
 	instance := isolateService.New()
 	defer instance.Cleanup()
 
-	code := `#include <stdio.h>
-	int fibo(int n) {
-		if(n <= 1) {
-			return n;
-		}
-		return fibo(n-1) + fibo(n-2);
-	}
-	int main() {
-		printf("%d",fibo(40));
+	code := `
+	public class HelloWorld {
+	    public static void main(String[] args) {
+		System.out.println("Hello, World!");
+	    }
 	}
 	`
-	lang := "C"
+	lang := "Java"
 	config := langConfigService.Get(lang, instance.ID())
 
 	for _, file := range config.SandboxFiles {
@@ -58,9 +55,11 @@ func runner(isolateService *services.IsolateService, compileService *services.Co
 		}
 	}
 
-	err := compileService.Compile(config.CompileScript)
-	if err != nil {
-		log.Fatal("Error on compile: ", err)
+	if len(config.CompileScript) != 0 {
+		err := compileService.Compile(config.CompileScript)
+		if err != nil {
+			log.Fatal("Error on compile: ", err)
+		}
 	}
 
 	// // If has input
@@ -69,24 +68,37 @@ func runner(isolateService *services.IsolateService, compileService *services.Co
 	// 	log.Fatal(err)
 	// }
 
-	err = instance.Run(config.RunScript, &models.Limit{
-		WallTime: 0.2,
-	}, false)
+	err := instance.Run(config.RunScript, nil, false)
 	if err != nil {
 		log.Println(err)
 	}
 
-	output, err := instance.GetOutput()
+	stdOut, err := instance.GetOutput()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("Output: ", output)
+	stdErr, err := instance.GetError()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	metadata, err := instance.GetMetadata()
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Metadata: ", metadata)
 
+	result := responses.Result{
+		SandboxMetadata: metadata,
+		Output:          stdOut,
+		Error:           stdErr,
+	}
+
+	resultStr, err := json.Marshal(result)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Result:", string(resultStr))
+	time.Sleep(5 * time.Hour)
 }

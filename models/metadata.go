@@ -7,11 +7,11 @@ import (
 )
 
 type Metadata struct {
-	Status   string
-	Message  string
-	Time     float32
-	WallTime float32
-	Memory   int
+	FailedStatus  string  `json:"failed_status"`
+	FailedMessage string  `json:"failed_message"`
+	Time          float32 `json:"time"`
+	WallTime      float32 `json:"wall_time"`
+	Memory        int     `json:"memory"`
 }
 
 func ParseMetadata(metadataStr string) (*Metadata, error) {
@@ -19,7 +19,11 @@ func ParseMetadata(metadataStr string) (*Metadata, error) {
 	for line := range strings.SplitSeq(metadataStr, "\n") {
 		if strings.HasPrefix(line, "status:") {
 			status := strings.TrimSpace(strings.TrimPrefix(line, "status:"))
-			metadata.Status = status
+			metadata.FailedStatus = status
+		}
+		if strings.HasPrefix(line, "message:") {
+			status := strings.TrimSpace(strings.TrimPrefix(line, "message:"))
+			metadata.FailedMessage = status
 		}
 		if strings.HasPrefix(line, "time:") {
 			time := strings.TrimSpace(strings.TrimPrefix(line, "time:"))
