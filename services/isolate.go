@@ -13,14 +13,17 @@ import (
 )
 
 type isolateService struct {
-	ctx     context.Context
-	boxID   int
-	boxPath string
+	ctx          context.Context
+	boxID        int
+	boxPath      string
+	metadataPath string
 }
 
 func NewIsolateService(ctx context.Context, boxID int) *isolateService {
 	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", boxID)
-	return &isolateService{ctx: ctx, boxID: boxID, boxPath: boxPath}
+	metadataPath := fmt.Sprintf("/tmp/metadata")
+
+	return &isolateService{ctx: ctx, boxID: boxID, boxPath: boxPath, metadataPath: metadataPath}
 }
 
 func (s *isolateService) execute(args ...string) error {
@@ -65,13 +68,14 @@ func (s *isolateService) Run(programPath string, runnerCmd []string, limit *mode
 
 	args := []string{
 		"--stdin=input",
+		"--meta=" + s.metadataPath,
 		"--stdout=output.txt",
 		"--run",
 		"--",
 		programPath,
 	}
 
-	args = append(args[:3], append(runnerCmd, args[3:]...)...)
+	args = append(args[:4], append(runnerCmd, args[4:]...)...)
 	args = append(_limits, args...)
 
 	err := s.execute(args...)
@@ -85,6 +89,23 @@ func (s *isolateService) GetOutput() (string, error) {
 	var stdErr bytes.Buffer
 
 	cmd := exec.CommandContext(s.ctx, "cat", fmt.Sprintf("%s/output.txt", s.boxPath))
+	cmd.Stdout = &stdOut
+	cmd.Stderr = &stdErr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", errors.New(stdErr.String())
+	}
+
+	return stdOut.String(), nil
+}
+
+func (s *isolateService) GetMetadata() (string, error) {
+	log.Println("Getting Metadata...")
+	var stdOut bytes.Buffer
+	var stdErr bytes.Buffer
+
+	cmd := exec.CommandContext(s.ctx, "cat", s.metadataPath)
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 

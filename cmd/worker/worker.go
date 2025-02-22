@@ -60,6 +60,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Println("Output: ", output)
+
+	metadata, err := isolateService.GetMetadata()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Metadata: ", metadata)
 
 }
