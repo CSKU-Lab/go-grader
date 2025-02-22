@@ -5,6 +5,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/SornchaiTheDev/go-grader/models"
 	"github.com/SornchaiTheDev/go-grader/services"
 )
 
@@ -68,9 +69,11 @@ func runner(isolateService *services.IsolateService, compileService *services.Co
 	// 	log.Fatal(err)
 	// }
 
-	err = instance.Run(config.RunScript, nil, false)
+	err = instance.Run(config.RunScript, &models.Limit{
+		WallTime: 0.2,
+	}, false)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	output, err := instance.GetOutput()

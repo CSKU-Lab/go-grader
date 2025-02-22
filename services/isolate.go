@@ -138,7 +138,7 @@ func (i *isolateInstance) GetOutput() (string, error) {
 	return stdOut.String(), nil
 }
 
-func (i *isolateInstance) GetMetadata() (string, error) {
+func (i *isolateInstance) getMetadata() (string, error) {
 	i.log("Getting Metadata...")
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
@@ -155,6 +155,15 @@ func (i *isolateInstance) GetMetadata() (string, error) {
 	return stdOut.String(), nil
 }
 
+func (i *isolateInstance) GetMetadata() (*models.Metadata, error) {
+	metadata, err := i.getMetadata()
+	if err != nil {
+		return nil, err
+	}
+
+	return models.ParseMetadata(metadata)
+}
+
 func getLimitArgs(limit *models.Limit) []string {
 	if limit == nil {
 		return []string{}
@@ -169,12 +178,18 @@ func getLimitArgs(limit *models.Limit) []string {
 		field := v.Field(i)
 		arg := t.Field(i).Tag.Get("arg")
 
-		if field.Kind() == reflect.Float32 {
+		switch field.Kind() {
+		case reflect.Int:
+			if field.Int() == 0 {
+				continue
+			}
+			args = append(args, fmt.Sprintf("%s=%d", arg, field.Int()))
+		case reflect.Float32:
 			if field.Float() == 0 {
 				continue
 			}
 			args = append(args, fmt.Sprintf("%s=%f", arg, field.Float()))
-		} else if field.Kind() == reflect.Bool {
+		case reflect.Bool:
 			if !field.Bool() {
 				continue
 			}
