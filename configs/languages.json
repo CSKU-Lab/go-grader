@@ -54,11 +54,9 @@
 				"main.go"
 			],
 			"compile_script": [
-				"/usr/bin/go",
-				"build",
-				"-o",
-				"main",
-				"$sandbox_path/main.go"
+				"/bin/sh",
+				"-c",
+				"cd $sandbox_path && go mod init main && go mod tidy && go build -o main main.go"
 			],
 			"run_script": [
 				"./main"

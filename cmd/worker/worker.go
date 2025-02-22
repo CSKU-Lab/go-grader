@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/SornchaiTheDev/go-grader/responses"
 	"github.com/SornchaiTheDev/go-grader/services"
@@ -39,13 +38,12 @@ func runner(isolateService *services.IsolateService, compileService *services.Co
 	defer instance.Cleanup()
 
 	code := `
-	public class HelloWorld {
-	    public static void main(String[] args) {
-		System.out.println("Hello, World!");
-	    }
+	package main
+	func main() {
+		println("Hello, World!")
 	}
 	`
-	lang := "Java"
+	lang := "Go"
 	config := langConfigService.Get(lang, instance.ID())
 
 	for _, file := range config.SandboxFiles {
@@ -100,5 +98,4 @@ func runner(isolateService *services.IsolateService, compileService *services.Co
 	}
 
 	log.Println("Result:", string(resultStr))
-	time.Sleep(5 * time.Hour)
 }
