@@ -8,15 +8,15 @@ import (
 	"os/exec"
 )
 
-type compileService struct {
+type CompileService struct {
 	ctx context.Context
 }
 
-func NewCompileService(ctx context.Context) *compileService {
-	return &compileService{ctx: ctx}
+func NewCompileService(ctx context.Context) *CompileService {
+	return &CompileService{ctx: ctx}
 }
 
-func (s *compileService) Compile(script []string) error {
+func (s *CompileService) Compile(script []string) error {
 	log.Println("Compiling code...")
 	cmd := exec.CommandContext(s.ctx, script[0], script[1:]...)
 	var stdErr bytes.Buffer

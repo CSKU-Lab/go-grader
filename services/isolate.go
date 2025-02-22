@@ -12,21 +12,50 @@ import (
 	"github.com/SornchaiTheDev/go-grader/models"
 )
 
-type isolateService struct {
+type IsolateService struct {
+	ctx    context.Context
+	boxIds chan int
+}
+
+func NewIsolateService(ctx context.Context, maxInstance int) *IsolateService {
+	boxIds := make(chan int, maxInstance)
+	for i := range maxInstance {
+		boxIds <- i
+	}
+
+	return &IsolateService{ctx: ctx, boxIds: boxIds}
+}
+
+type isolateInstance struct {
 	ctx          context.Context
 	boxID        int
 	boxPath      string
 	metadataPath string
+	boxIds       chan int
 }
 
-func NewIsolateService(ctx context.Context, boxID int) *isolateService {
+func (s *IsolateService) New() *isolateInstance {
+	boxID := <-s.boxIds
 	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", boxID)
-	metadataPath := fmt.Sprintf("/tmp/metadata")
+	metadataPath := fmt.Sprintf("/tmp/box_%d_metadata", boxID)
 
-	return &isolateService{ctx: ctx, boxID: boxID, boxPath: boxPath, metadataPath: metadataPath}
+	instance := isolateInstance{
+		ctx:          s.ctx,
+		boxID:        boxID,
+		boxPath:      boxPath,
+		metadataPath: metadataPath,
+		boxIds:       s.boxIds,
+	}
+	instance.init()
+
+	return &instance
 }
 
-func (s *isolateService) execute(args ...string) error {
+func (i *isolateInstance) log(format string, args ...any) {
+	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
+}
+
+func (s *isolateInstance) execute(args ...string) error {
 	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
 	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
 	var stdOut bytes.Buffer
@@ -42,33 +71,40 @@ func (s *isolateService) execute(args ...string) error {
 	return nil
 }
 
-func (s *isolateService) Init() error {
-	log.Printf("Initializing sandbox (ID %d)...", s.boxID)
-	err := s.execute("--init")
+func (i *isolateInstance) init() error {
+	i.log("Initializing sandbox...")
+	err := i.execute("--init")
 	return err
 }
 
-func (s *isolateService) Cleanup() error {
-	log.Printf("Cleaning up sandbox (ID %d)...", s.boxID)
-	err := s.execute("--cleanup")
+func (i *isolateInstance) ID() int {
+	return i.boxID
+}
+
+func (i *isolateInstance) Cleanup() error {
+	i.log("Cleaning up sandbox...")
+	err := i.execute("--cleanup")
+	if err == nil {
+		i.boxIds <- i.boxID
+	}
 	return err
 }
 
-func (s *isolateService) CreateFile(name string, content string) error {
-	log.Printf("Creating file %s...", name)
-	filePath := fmt.Sprintf("%s/%s", s.boxPath, name)
-	cmd := exec.CommandContext(s.ctx, "sh", "-c", fmt.Sprintf("echo %q > %q", content, filePath))
+func (i *isolateInstance) CreateFile(name string, content string) error {
+	i.log("Creating file %s...", name)
+	filePath := fmt.Sprintf("%s/%s", i.boxPath, name)
+	cmd := exec.CommandContext(i.ctx, "sh", "-c", fmt.Sprintf("echo %q > %q", content, filePath))
 	err := cmd.Run()
 	return err
 }
 
-func (s *isolateService) Run(programPath string, runnerCmd []string, limit *models.Limit) error {
-	log.Println("Running program...")
+func (i *isolateInstance) Run(programPath string, runnerCmd []string, limit *models.Limit) error {
+	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
 	args := []string{
 		"--stdin=input",
-		"--meta=" + s.metadataPath,
+		"--meta=" + i.metadataPath,
 		"--stdout=output.txt",
 		"--run",
 		"--",
@@ -78,17 +114,17 @@ func (s *isolateService) Run(programPath string, runnerCmd []string, limit *mode
 	args = append(args[:4], append(runnerCmd, args[4:]...)...)
 	args = append(_limits, args...)
 
-	err := s.execute(args...)
+	err := i.execute(args...)
 
 	return err
 }
 
-func (s *isolateService) GetOutput() (string, error) {
-	log.Println("Getting output...")
+func (i *isolateInstance) GetOutput() (string, error) {
+	i.log("Getting output...")
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
 
-	cmd := exec.CommandContext(s.ctx, "cat", fmt.Sprintf("%s/output.txt", s.boxPath))
+	cmd := exec.CommandContext(i.ctx, "cat", fmt.Sprintf("%s/output.txt", i.boxPath))
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 
@@ -100,12 +136,12 @@ func (s *isolateService) GetOutput() (string, error) {
 	return stdOut.String(), nil
 }
 
-func (s *isolateService) GetMetadata() (string, error) {
-	log.Println("Getting Metadata...")
+func (i *isolateInstance) GetMetadata() (string, error) {
+	i.log("Getting Metadata...")
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
 
-	cmd := exec.CommandContext(s.ctx, "cat", s.metadataPath)
+	cmd := exec.CommandContext(i.ctx, "cat", i.metadataPath)
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 

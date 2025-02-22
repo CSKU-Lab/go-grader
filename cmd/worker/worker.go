@@ -4,66 +4,79 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 
-	"github.com/SornchaiTheDev/go-grader/models"
 	"github.com/SornchaiTheDev/go-grader/services"
 )
+
+var wg sync.WaitGroup
 
 func main() {
 	ctx := context.Background()
 
-	boxID := 0
-
-	isolateService := services.NewIsolateService(ctx, boxID)
-	defer isolateService.Cleanup()
-
+	isolateService := services.NewIsolateService(ctx, 2)
 	compileService := services.NewCompileService(ctx)
 
-	fmt.Println("Starting worker...")
-	err := isolateService.Init()
-	if err != nil {
-		log.Fatal(err)
-	}
+	wg.Add(1)
+	go runner(isolateService, compileService)
+	wg.Add(1)
+	go runner(isolateService, compileService)
+	wg.Add(1)
+	go runner(isolateService, compileService)
+	wg.Add(1)
+	go runner(isolateService, compileService)
+
+	wg.Wait()
+	log.Println("All done")
+}
+
+func runner(isolateService *services.IsolateService, compileService *services.CompileService) {
+	defer wg.Done()
+
+	instance := isolateService.New()
+	defer instance.Cleanup()
 
 	code := `#include <stdio.h>
+	int fibo(int n) {
+		if(n <= 1) {
+			return n;
+		}
+		return fibo(n-1) + fibo(n-2);
+	}
 	int main() {
-		int i;
-		scanf("%d", &i);
-		printf("%d\\n", i * 2);
+		printf("%d",fibo(40));
 	}
 	`
 
-	err = isolateService.CreateFile("main.c", code)
+	err := instance.CreateFile("main.c", code)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", boxID)
+	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", instance.ID())
 	err = compileService.Compile([]string{"gcc", boxPath + "/main.c", "-o", boxPath + "/program"})
 	if err != nil {
 		log.Fatal("Error on compile: ", err)
 	}
 
-	err = isolateService.CreateFile("input", "1")
+	err = instance.CreateFile("input", "1")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = isolateService.Run("./program", []string{}, &models.Limit{
-		WallTime: 0.5,
-	})
+	err = instance.Run("./program", []string{}, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	output, err := isolateService.GetOutput()
+	output, err := instance.GetOutput()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Println("Output: ", output)
 
-	metadata, err := isolateService.GetMetadata()
+	metadata, err := instance.GetMetadata()
 	if err != nil {
 		log.Fatal(err)
 	}
