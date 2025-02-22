@@ -1,0 +1,77 @@
+{
+	"languages": [
+		{
+			"name": "C",
+			"version": "99",
+			"sandbox_files": [
+				"main.c"
+			],
+			"compile_script": [
+				"gcc",
+				"$sandbox_path/main.c",
+				"-o",
+				"$sandbox_path/main"
+			],
+			"run_script": [
+				"./main"
+			]
+		},
+		{
+			"name": "C++",
+			"version": "C++11",
+			"sandbox_files": [
+				"main.cpp"
+			],
+			"compile_script": [
+				"g++",
+				"$file_path",
+				"-o",
+				"$program_path"
+			],
+			"run_script": [
+				"./main"
+			]
+		},
+		{
+			"name": "Java",
+			"version": "Java 17",
+			"sandbox_files": [
+				"Main.java"
+			],
+			"compile_script": [
+				"javac",
+				"$file_path"
+			],
+			"run_script": [
+				"java",
+				"Main"
+			]
+		},
+		{
+			"name": "Go",
+			"version": "1.24",
+			"sandbox_files": [
+				"main.go"
+			],
+			"compile_script": [
+				"go",
+				"build",
+				"$file_path"
+			],
+			"run_script": [
+				"./main"
+			]
+		},
+		{
+			"name": "Python",
+			"version": "3.8",
+			"sandbox_files": [
+				"main.go"
+			],
+			"run_script": [
+				"python",
+				"main.py"
+			]
+		}
+	]
+}

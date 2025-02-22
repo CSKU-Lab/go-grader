@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 
@@ -14,23 +13,24 @@ var wg sync.WaitGroup
 func main() {
 	ctx := context.Background()
 
-	isolateService := services.NewIsolateService(ctx, 2)
+	isolateService := services.NewIsolateService(ctx, 1)
 	compileService := services.NewCompileService(ctx)
+	languageService := services.NewLanguageConfigService()
 
 	wg.Add(1)
-	go runner(isolateService, compileService)
-	wg.Add(1)
-	go runner(isolateService, compileService)
-	wg.Add(1)
-	go runner(isolateService, compileService)
-	wg.Add(1)
-	go runner(isolateService, compileService)
+	go runner(isolateService, compileService, languageService)
+	// wg.Add(1)
+	// go runner(isolateService, compileService, languageService)
+	// wg.Add(1)
+	// go runner(isolateService, compileService, languageService)
+	// wg.Add(1)
+	// go runner(isolateService, compileService, languageService)
 
 	wg.Wait()
 	log.Println("All done")
 }
 
-func runner(isolateService *services.IsolateService, compileService *services.CompileService) {
+func runner(isolateService *services.IsolateService, compileService *services.CompileService, langConfigService *services.LanguageConfigService) {
 	defer wg.Done()
 
 	instance := isolateService.New()
@@ -47,24 +47,28 @@ func runner(isolateService *services.IsolateService, compileService *services.Co
 		printf("%d",fibo(40));
 	}
 	`
+	lang := "C"
+	config := langConfigService.Get(lang, instance.ID())
 
-	err := instance.CreateFile("main.c", code)
-	if err != nil {
-		log.Fatal(err)
+	for _, file := range config.SandboxFiles {
+		err := instance.CreateFile(file, code)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	boxPath := fmt.Sprintf("/var/local/lib/isolate/%d/box", instance.ID())
-	err = compileService.Compile([]string{"gcc", boxPath + "/main.c", "-o", boxPath + "/program"})
+	err := compileService.Compile(config.CompileScript)
 	if err != nil {
 		log.Fatal("Error on compile: ", err)
 	}
 
-	err = instance.CreateFile("input", "1")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// // If has input
+	// err = instance.CreateFile("input", "1")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	err = instance.Run("./program", []string{}, nil)
+	err = instance.Run(config.RunScript, nil, false)
 	if err != nil {
 		log.Fatal(err)
 	}

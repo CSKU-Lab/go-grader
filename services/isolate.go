@@ -98,21 +98,23 @@ func (i *isolateInstance) CreateFile(name string, content string) error {
 	return err
 }
 
-func (i *isolateInstance) Run(programPath string, runnerCmd []string, limit *models.Limit) error {
+func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput bool) error {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
 	args := []string{
-		"--stdin=input",
 		"--meta=" + i.metadataPath,
 		"--stdout=output.txt",
 		"--run",
 		"--",
-		programPath,
 	}
 
-	args = append(args[:4], append(runnerCmd, args[4:]...)...)
+	if hasInput {
+		args = append([]string{"--stdin=input"}, args...)
+	}
+
 	args = append(_limits, args...)
+	args = append(args, runnerCmd...)
 
 	err := i.execute(args...)
 
