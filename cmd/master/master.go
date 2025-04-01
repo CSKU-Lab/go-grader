@@ -20,7 +20,9 @@ func main() {
 	defer rb.Close()
 
 	execution := models.Execution{
-		Code:       `import time;time.sleep(5);print("Hello World")`,
+		Code:       `import time
+time.sleep(2
+print("Hello, World!")`,
 		LanguageID: "python_3.8",
 	}
 
