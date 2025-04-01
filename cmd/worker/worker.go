@@ -13,7 +13,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	isolateService := services.NewIsolateService(ctx, 2)
+	isolateService := services.NewIsolateService(ctx)
 	compileService := services.NewCompileService(ctx)
 	languageService := services.NewLanguageConfigService()
 	runnerService := services.NewRunnerService(isolateService, compileService, languageService)

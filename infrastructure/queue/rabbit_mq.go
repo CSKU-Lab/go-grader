@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 
+	"github.com/SornchaiTheDev/go-grader/constants"
 	"github.com/SornchaiTheDev/go-grader/domain/messaging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -54,8 +55,9 @@ func (r *rabbitmq) Publish(ctx context.Context, queue string, message []byte) er
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        message,
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         message,
 		},
 	)
 	if err != nil {
@@ -66,6 +68,11 @@ func (r *rabbitmq) Publish(ctx context.Context, queue string, message []byte) er
 
 func (r *rabbitmq) Consume(ctx context.Context, queue string, handler func(message []byte)) error {
 	q, err := r.declareQueue(queue)
+	if err != nil {
+		return err
+	}
+
+	err = r.ch.Qos(constants.MAX_QUEUES, 0, false)
 	if err != nil {
 		return err
 	}
@@ -85,8 +92,10 @@ func (r *rabbitmq) Consume(ctx context.Context, queue string, handler func(messa
 	}
 
 	for msg := range msgs {
-		go handler(msg.Body)
-		msg.Ack(false)
+		go func() {
+			handler(msg.Body)
+			msg.Ack(false)
+		}()
 	}
 
 	return nil

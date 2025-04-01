@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/SornchaiTheDev/go-grader/constants"
 	"github.com/SornchaiTheDev/go-grader/models"
 )
 
@@ -18,9 +19,9 @@ type IsolateService struct {
 	boxIds chan int
 }
 
-func NewIsolateService(ctx context.Context, maxInstance int) *IsolateService {
-	boxIds := make(chan int, maxInstance)
-	for i := range maxInstance {
+func NewIsolateService(ctx context.Context) *IsolateService {
+	boxIds := make(chan int, constants.MAX_QUEUES)
+	for i := range constants.MAX_QUEUES {
 		boxIds <- i
 	}
 
