@@ -4,98 +4,37 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"sync"
 
-	"github.com/SornchaiTheDev/go-grader/responses"
+	"github.com/SornchaiTheDev/go-grader/infrastructure/queue"
+	"github.com/SornchaiTheDev/go-grader/models"
 	"github.com/SornchaiTheDev/go-grader/services"
 )
-
-var wg sync.WaitGroup
 
 func main() {
 	ctx := context.Background()
 
-	isolateService := services.NewIsolateService(ctx, 1)
+	isolateService := services.NewIsolateService(ctx, 2)
 	compileService := services.NewCompileService(ctx)
 	languageService := services.NewLanguageConfigService()
+	runnerService := services.NewRunnerService(isolateService, compileService, languageService)
 
-	wg.Add(1)
-	go runner(isolateService, compileService, languageService)
-	// wg.Add(1)
-	// go runner(isolateService, compileService, languageService)
-	// wg.Add(1)
-	// go runner(isolateService, compileService, languageService)
-	// wg.Add(1)
-	// go runner(isolateService, compileService, languageService)
-	wg.Wait()
-	log.Println("All done")
-}
-
-func runner(isolateService *services.IsolateService, compileService *services.CompileService, langConfigService *services.LanguageConfigService) {
-	defer wg.Done()
-
-	instance := isolateService.New()
-	defer instance.Cleanup()
-
-	code := `
-	package main
-	func main() {
-		println("Hello, World!")
+	rb, err := queue.NewRabbitMQ()
+	if err != nil {
+		log.Fatalln("Cannot initialize RabbitMQ")
 	}
-	`
-	lang := "Go"
-	config := langConfigService.Get(lang, instance.ID())
 
-	for _, file := range config.SandboxFiles {
-		err := instance.CreateFile(file, code)
+	rb.Consume(ctx, "execution", func(message []byte) {
+		execution := &models.Execution{}
+
+		err := json.Unmarshal(message, execution)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln("Cannot unmarshal message")
 		}
-	}
-
-	if len(config.CompileScript) != 0 {
-		err := compileService.Compile(config.CompileScript)
+		stdOut, stdErr, metadata, err := runnerService.Run(execution)
 		if err != nil {
-			log.Fatal("Error on compile: ", err)
+			log.Fatalln("Error from runner ", err)
 		}
-	}
 
-	// // If has input
-	// err = instance.CreateFile("input", "1")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	err := instance.Run(config.RunScript, nil, false)
-	if err != nil {
-		log.Println(err)
-	}
-
-	stdOut, err := instance.GetOutput()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	stdErr, err := instance.GetError()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	metadata, err := instance.GetMetadata()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	result := responses.Result{
-		SandboxMetadata: metadata,
-		Output:          stdOut,
-		Error:           stdErr,
-	}
-
-	resultStr, err := json.Marshal(result)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("Result:", string(resultStr))
+		log.Println(stdOut, stdErr, metadata)
+	})
 }

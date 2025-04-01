@@ -20,9 +20,9 @@ func NewLanguageConfigService() *LanguageConfigService {
 	return &LanguageConfigService{languages: languages}
 }
 
-func (s *LanguageConfigService) Get(name string, boxID int) *models.LanguageConfig {
+func (s *LanguageConfigService) Get(id string, boxID int) *models.LanguageConfig {
 	for _, language := range s.languages {
-		if language.Name == name {
+		if language.ID == id {
 			return &models.LanguageConfig{
 				Name:          language.Name,
 				Version:       language.Version,
