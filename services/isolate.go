@@ -135,7 +135,6 @@ func (i *isolateInstance) GetError() (string, error) {
 }
 
 func (i *isolateInstance) catFile(fileName string) (string, error) {
-
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
 
