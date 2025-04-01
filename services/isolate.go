@@ -8,8 +8,8 @@ import (
 	"log"
 	"os/exec"
 	"reflect"
+	"strings"
 
-	"github.com/SornchaiTheDev/go-grader/constants"
 	"github.com/SornchaiTheDev/go-grader/models"
 )
 
@@ -35,15 +35,13 @@ type isolateInstance struct {
 	boxIds       chan int
 }
 
-func (s *IsolateService) New() *isolateInstance {
+func (s *IsolateService) NewInstance() *isolateInstance {
 	boxID := <-s.boxIds
-	boxPath := fmt.Sprintf(constants.BOX_PATH, boxID)
 	metadataPath := fmt.Sprintf("/tmp/box_%d_metadata", boxID)
 
 	instance := isolateInstance{
 		ctx:          s.ctx,
 		boxID:        boxID,
-		boxPath:      boxPath,
 		metadataPath: metadataPath,
 		boxIds:       s.boxIds,
 	}
@@ -56,7 +54,7 @@ func (i *isolateInstance) log(format string, args ...any) {
 	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
-func (s *isolateInstance) execute(args ...string) error {
+func (s *isolateInstance) execute(args ...string) (*bytes.Buffer, error) {
 	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
 	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
 	var stdOut bytes.Buffer
@@ -67,14 +65,18 @@ func (s *isolateInstance) execute(args ...string) error {
 
 	err := cmd.Run()
 	if err != nil {
-		return errors.New(err.Error() + " : " + stdErr.String())
+		return nil, errors.New(err.Error() + " : " + stdErr.String())
 	}
-	return nil
+	return &stdOut, nil
 }
 
 func (i *isolateInstance) init() error {
 	i.log("Initializing sandbox...")
-	err := i.execute("--init")
+	output, err := i.execute("--init")
+	boxPath := output.String()
+	boxPath = strings.TrimSpace(boxPath)
+	i.boxPath = boxPath + "/box"
+
 	return err
 }
 
@@ -84,7 +86,7 @@ func (i *isolateInstance) ID() int {
 
 func (i *isolateInstance) Cleanup() error {
 	i.log("Cleaning up sandbox...")
-	err := i.execute("--cleanup")
+	_, err := i.execute("--cleanup")
 	if err == nil {
 		i.boxIds <- i.boxID
 	}
@@ -119,7 +121,8 @@ func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput 
 	args = append(_limits, args...)
 	args = append(args, runnerCmd...)
 
-	err := i.execute(args...)
+	log.Println(args)
+	_, err := i.execute(args...)
 
 	return err
 }
