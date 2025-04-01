@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Copy the Go Modules and download dependencies
 COPY go.mod go.sum ./
-RUN go mod tidy
+RUN go mod download
 
 # Copy the entire Go application to the container
 COPY . .
