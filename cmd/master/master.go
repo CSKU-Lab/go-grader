@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/SornchaiTheDev/go-grader/infrastructure/queue"
 	"github.com/SornchaiTheDev/go-grader/models"
@@ -19,7 +20,7 @@ func main() {
 	defer rb.Close()
 
 	execution := models.Execution{
-		Code: `print("Hello World")`,
+		Code:       `import time;time.sleep(5);print("Hello World")`,
 		LanguageID: "python_3.8",
 	}
 
@@ -28,10 +29,15 @@ func main() {
 		log.Fatalln("Cannot parse execution struct to json")
 	}
 
-	err = rb.Publish(ctx, "execution", message)
-	if err != nil {
-		log.Fatalln("Cannot publish message to the execution queue")
-	}
+	for {
+		for range 10 {
+			err = rb.Publish(ctx, "execution", message)
+			if err != nil {
+				log.Fatalln("Cannot publish message to the execution queue")
+			}
 
-	log.Println("Publish message to the queue successfully!")
+			log.Println("Publish message to the queue successfully!")
+		}
+		time.Sleep(time.Second * 2)
+	}
 }
