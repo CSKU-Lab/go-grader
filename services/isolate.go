@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"reflect"
 
@@ -64,10 +65,8 @@ func (s *isolateInstance) execute(args ...string) (*bytes.Buffer, error) {
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 
-	err := cmd.Run()
-	if err != nil {
-		return nil, errors.New(err.Error() + " : " + stdErr.String())
-	}
+	cmd.Run()
+
 	return &stdOut, nil
 }
 
@@ -93,9 +92,7 @@ func (i *isolateInstance) Cleanup() error {
 func (i *isolateInstance) CreateFile(name string, content string) error {
 	i.log("Creating file %s...", name)
 	filePath := fmt.Sprintf("%s/%s", i.boxPath, name)
-	cmd := exec.CommandContext(i.ctx, "sh", "-c", fmt.Sprintf("echo %q > %q", content, filePath))
-	err := cmd.Run()
-	return err
+	return os.WriteFile(filePath, []byte(content), 0644)
 }
 
 func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput bool) error {
@@ -118,7 +115,6 @@ func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput 
 	args = append(_limits, args...)
 	args = append(args, runnerCmd...)
 
-	log.Println(args)
 	_, err := i.execute(args...)
 
 	return err
