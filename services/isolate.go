@@ -8,7 +8,6 @@ import (
 	"log"
 	"os/exec"
 	"reflect"
-	"strings"
 
 	"github.com/SornchaiTheDev/go-grader/constants"
 	"github.com/SornchaiTheDev/go-grader/models"
@@ -43,6 +42,7 @@ func (s *IsolateService) NewInstance() *isolateInstance {
 	instance := isolateInstance{
 		ctx:          s.ctx,
 		boxID:        boxID,
+		boxPath:      fmt.Sprintf(constants.BOX_PATH, boxID),
 		metadataPath: metadataPath,
 		boxIds:       s.boxIds,
 	}
@@ -73,11 +73,7 @@ func (s *isolateInstance) execute(args ...string) (*bytes.Buffer, error) {
 
 func (i *isolateInstance) init() error {
 	i.log("Initializing sandbox...")
-	output, err := i.execute("--init")
-	boxPath := output.String()
-	boxPath = strings.TrimSpace(boxPath)
-	i.boxPath = boxPath + "/box"
-
+	_, err := i.execute("--init")
 	return err
 }
 

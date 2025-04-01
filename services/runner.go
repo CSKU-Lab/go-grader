@@ -23,7 +23,7 @@ func NewRunnerService(isolateService *IsolateService, compileService *CompileSer
 
 func (r *runnerService) Run(e *models.Execution) (string, string, *models.Metadata, error) {
 	instance := r.isolateService.NewInstance()
-	// defer instance.Cleanup()
+	defer instance.Cleanup()
 
 	config := r.langConfigService.Get(e.LanguageID, instance.ID())
 
