@@ -1,6 +1,7 @@
 {
 	"languages": [
 		{
+			"id": "C_99",
 			"name": "C",
 			"version": "99",
 			"sandbox_files": [
@@ -17,6 +18,7 @@
 			]
 		},
 		{
+			"id": "cpp_11",
 			"name": "C++",
 			"version": "C++11",
 			"sandbox_files": [
@@ -33,6 +35,7 @@
 			]
 		},
 		{
+			"id": "java_17",
 			"name": "Java",
 			"version": "Java 17",
 			"sandbox_files": [
@@ -48,6 +51,7 @@
 			]
 		},
 		{
+			"id": "go_1.24",
 			"name": "Go",
 			"version": "1.24",
 			"sandbox_files": [
@@ -63,6 +67,7 @@
 			]
 		},
 		{
+			"id": "python_3.8",
 			"name": "Python",
 			"version": "3.8",
 			"sandbox_files": [
