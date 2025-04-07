@@ -1,3 +1,6 @@
 [submodule "isolate-docker"]
 	path = isolate-docker
 	url = git@github.com:SornchaiTheDev/isolate-docker
+[submodule "protos"]
+	path = protos
+	url = git@github.com:CSKU-Lab/protos
