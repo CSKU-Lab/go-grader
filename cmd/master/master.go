@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/SornchaiTheDev/go-grader/infrastructure/queue"
-	"github.com/SornchaiTheDev/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
+	"github.com/CSKU-Lab/go-grader/models"
 )
 
 func main() {

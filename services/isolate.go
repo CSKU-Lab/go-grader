@@ -10,8 +10,8 @@ import (
 	"os/exec"
 	"reflect"
 
-	"github.com/SornchaiTheDev/go-grader/constants"
-	"github.com/SornchaiTheDev/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/constants"
+	"github.com/CSKU-Lab/go-grader/models"
 )
 
 type IsolateService struct {

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SornchaiTheDev/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/models"
 )
 
 type runnerService struct {

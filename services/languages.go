@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/SornchaiTheDev/go-grader/constants"
-	"github.com/SornchaiTheDev/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/constants"
+	"github.com/CSKU-Lab/go-grader/models"
 )
 
 type LanguageConfigService struct {

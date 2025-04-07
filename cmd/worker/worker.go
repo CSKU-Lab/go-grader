@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/SornchaiTheDev/go-grader/infrastructure/queue"
-	"github.com/SornchaiTheDev/go-grader/models"
-	"github.com/SornchaiTheDev/go-grader/services"
+	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
+	"github.com/CSKU-Lab/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/services"
 )
 
 func main() {

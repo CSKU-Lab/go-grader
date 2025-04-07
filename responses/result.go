@@ -1,6 +1,6 @@
 package responses
 
-import "github.com/SornchaiTheDev/go-grader/models"
+import "github.com/CSKU-Lab/go-grader/models"
 
 type Result struct {
 	SandboxMetadata *models.Metadata `json:"sandbox_metadata"`

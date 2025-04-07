@@ -3,8 +3,8 @@ package queue
 import (
 	"context"
 
-	"github.com/SornchaiTheDev/go-grader/constants"
-	"github.com/SornchaiTheDev/go-grader/domain/messaging"
+	"github.com/CSKU-Lab/go-grader/constants"
+	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
