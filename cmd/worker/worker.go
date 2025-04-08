@@ -16,31 +16,27 @@ import (
 func main() {
 	ctx := context.Background()
 
-	conn, err := grpc.NewClient("host.docker.internal:8081", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("Failed to connect to gRPC server: %v", err)
-	}
-	defer conn.Close()
+	grpc, close := initgRPCClient()
+	defer close()
 
-	c := pb.NewConfigServiceClient(conn)
-
-	languages, err := c.GetLanguages(ctx, nil)
+	languages, err := grpc.GetLanguages(ctx, &pb.GetLanguagesRequest{})
 	if err != nil {
-		log.Fatalf("Failed to get languages: %v", err)
+		log.Fatalln("Cannot get languages from gRPC server : ", err)
 	}
-	log.Println("Languages: ", languages)
+
+	log.Println(languages)
+
+	q, err := queue.NewRabbitMQ()
+	if err != nil {
+		log.Fatalln("Cannot initialize RabbitMQ")
+	}
 
 	isolateService := services.NewIsolateService(ctx)
 	compileService := services.NewCompileService(ctx)
 	languageService := services.NewLanguageConfigService()
 	runnerService := services.NewRunnerService(isolateService, compileService, languageService)
 
-	rb, err := queue.NewRabbitMQ()
-	if err != nil {
-		log.Fatalln("Cannot initialize RabbitMQ")
-	}
-
-	rb.Consume(ctx, "execution", func(message []byte) {
+	q.Consume(ctx, "execution", func(message []byte) {
 		execution := &models.Execution{}
 
 		err := json.Unmarshal(message, execution)
@@ -54,4 +50,19 @@ func main() {
 
 		log.Println(stdOut, stdErr, metadata)
 	})
+
+	log.Println("Languages from gRPC server: ", languages)
+}
+
+func initgRPCClient() (client pb.ConfigServiceClient, close func()) {
+	conn, err := grpc.NewClient("host.docker.internal:8081", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect to gRPC server: %v", err)
+	}
+
+	c := pb.NewConfigServiceClient(conn)
+
+	return c, func() {
+		conn.Close()
+	}
 }
