@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"os"
+	"path"
 
 	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
 	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
@@ -19,12 +21,12 @@ func main() {
 	grpc, close := initgRPCClient()
 	defer close()
 
-	languages, err := grpc.GetLanguages(ctx, &pb.GetLanguagesRequest{})
+	res, err := grpc.GetLanguages(ctx, &pb.GetLanguagesRequest{})
 	if err != nil {
 		log.Fatalln("Cannot get languages from gRPC server : ", err)
 	}
 
-	log.Println(languages)
+	setupLanguages(res.Languages)
 
 	q, err := queue.NewRabbitMQ()
 	if err != nil {
@@ -50,8 +52,6 @@ func main() {
 
 		log.Println(stdOut, stdErr, metadata)
 	})
-
-	log.Println("Languages from gRPC server: ", languages)
 }
 
 func initgRPCClient() (client pb.ConfigServiceClient, close func()) {
@@ -65,4 +65,39 @@ func initgRPCClient() (client pb.ConfigServiceClient, close func()) {
 	return c, func() {
 		conn.Close()
 	}
+}
+
+func setupLanguages(languages []*pb.Language) {
+	configPath := "/var/lib/worker/languages"
+
+	err := os.MkdirAll(configPath, 0755)
+	if err != nil {
+		log.Fatalln("Cannot create config directory : ", err)
+	}
+	log.Println("Config directory is created.")
+
+	for _, lang := range languages {
+		langDir := path.Join(configPath, lang.GetId())
+		err := os.Mkdir(langDir, 0755)
+		if err != nil {
+			log.Fatalf("Cannot create %s config directory", lang.Id)
+		}
+
+		if lang.GetBuildScript() != "" {
+			buildPath := path.Join(langDir, "build_script.sh")
+			err := os.WriteFile(buildPath, []byte(lang.GetBuildScript()), 0755)
+			if err != nil {
+				log.Fatalf("Cannot write %s build_script.sh", lang.GetId())
+			}
+		}
+
+		if lang.GetRunScript() != "" {
+			runPath := path.Join(langDir, "run_script.sh")
+			err := os.WriteFile(runPath, []byte(lang.GetRunScript()), 0757)
+			if err != nil {
+				log.Fatalf("Cannot write %s run_script.sh", lang.GetId())
+			}
+		}
+	}
+	log.Println("Finish setup languages config. :D")
 }
