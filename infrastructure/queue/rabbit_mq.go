@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 
 	"github.com/CSKU-Lab/go-grader/constants"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
@@ -9,8 +10,9 @@ import (
 )
 
 type rabbitmq struct {
-	conn *amqp.Connection
-	ch   *amqp.Channel
+	conn     *amqp.Connection
+	ch       *amqp.Channel
+	confirms chan amqp.Confirmation
 }
 
 func NewRabbitMQ() (messaging.Queue, error) {
@@ -25,9 +27,17 @@ func NewRabbitMQ() (messaging.Queue, error) {
 		return nil, err
 	}
 
+	err = ch.Confirm(false)
+	if err != nil {
+		return nil, err
+	}
+
+	confirms := ch.NotifyPublish(make(chan amqp.Confirmation))
+
 	return &rabbitmq{
-		conn: conn,
-		ch:   ch,
+		conn:     conn,
+		ch:       ch,
+		confirms: confirms,
 	}, nil
 }
 
@@ -63,7 +73,14 @@ func (r *rabbitmq) Publish(ctx context.Context, queue string, message []byte) er
 	if err != nil {
 		return err
 	}
-	return nil
+
+	confirmed := <-r.confirms
+
+	if confirmed.Ack {
+		return nil
+	} else {
+		return errors.New("failed to publish message to the queue")
+	}
 }
 
 func (r *rabbitmq) Consume(ctx context.Context, queue string, handler func(message []byte)) error {
