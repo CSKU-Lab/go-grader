@@ -175,7 +175,7 @@ func setupCompares(wg *sync.WaitGroup, compares []*pb.CompareResponse) {
 				log.Fatalf("Cannot build compare script for %s : %s", compare.GetId(), err)
 			}
 
-			scriptPath := path.Join(comparePath, compare.GetId())
+			scriptPath := path.Join(comparePath, compare.GetRunName())
 			err = utils.MoveFile(exePath, scriptPath)
 			if err != nil {
 				log.Fatalf("Cannot move compare script %s : %s", compare.GetId(), err)
