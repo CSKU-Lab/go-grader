@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path"
@@ -51,6 +50,21 @@ func main() {
 	runnerService := services.NewRunnerService(isolateService, compileService, languageService)
 
 	log.Println("Worker is ready to start working 🤖...")
+
+	q.Consume(ctx, "running", func(message []byte) {
+		execution := &models.Execution{}
+
+		err := json.Unmarshal(message, execution)
+		if err != nil {
+			log.Fatalln("Cannot unmarshal message")
+		}
+		stdOut, stdErr, metadata, err := runnerService.Run(execution)
+		if err != nil {
+			log.Fatalln("Error from runner ", err)
+		}
+
+		log.Println(stdOut, stdErr, metadata)
+	})
 
 	q.Consume(ctx, "execution", func(message []byte) {
 		execution := &models.Execution{}
@@ -181,8 +195,7 @@ func setupCompares(wg *sync.WaitGroup, compares []*pb.CompareResponse) {
 }
 
 func buildCompareScript(runner *services.IsolateInstance, compare *pb.CompareResponse) (string, error) {
-	scriptName := fmt.Sprintf("%s.cpp", compare.GetName())
-	err := runner.CreateFile(scriptName, compare.GetScript())
+	err := runner.CreateFile(compare.GetScriptName(), compare.GetScript())
 	if err != nil {
 		return "", nil
 	}
@@ -197,7 +210,7 @@ func buildCompareScript(runner *services.IsolateInstance, compare *pb.CompareRes
 		return "", nil
 	}
 
-	exePath := path.Join(runner.BoxPath(), compare.GetId())
+	exePath := path.Join(runner.BoxPath(), compare.GetRunName())
 	return exePath, nil
 }
 
