@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: config/v1/config.proto
+// source: config/v1/service.proto
 
 package v1
 
@@ -25,6 +25,11 @@ const (
 	ConfigService_AddLanguage_FullMethodName    = "/config.v1.ConfigService/AddLanguage"
 	ConfigService_UpdateLanguage_FullMethodName = "/config.v1.ConfigService/UpdateLanguage"
 	ConfigService_DeleteLanguage_FullMethodName = "/config.v1.ConfigService/DeleteLanguage"
+	ConfigService_GetCompares_FullMethodName    = "/config.v1.ConfigService/GetCompares"
+	ConfigService_GetCompare_FullMethodName     = "/config.v1.ConfigService/GetCompare"
+	ConfigService_AddCompare_FullMethodName     = "/config.v1.ConfigService/AddCompare"
+	ConfigService_UpdateCompare_FullMethodName  = "/config.v1.ConfigService/UpdateCompare"
+	ConfigService_DeleteCompare_FullMethodName  = "/config.v1.ConfigService/DeleteCompare"
 )
 
 // ConfigServiceClient is the client API for ConfigService service.
@@ -36,6 +41,11 @@ type ConfigServiceClient interface {
 	AddLanguage(ctx context.Context, in *AddLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error)
 	UpdateLanguage(ctx context.Context, in *UpdateLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error)
 	DeleteLanguage(ctx context.Context, in *DeleteLanguageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetCompares(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetComparesResponse, error)
+	GetCompare(ctx context.Context, in *GetCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error)
+	AddCompare(ctx context.Context, in *AddCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error)
+	UpdateCompare(ctx context.Context, in *UpdateCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error)
+	DeleteCompare(ctx context.Context, in *DeleteCompareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type configServiceClient struct {
@@ -96,6 +106,56 @@ func (c *configServiceClient) DeleteLanguage(ctx context.Context, in *DeleteLang
 	return out, nil
 }
 
+func (c *configServiceClient) GetCompares(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetComparesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetComparesResponse)
+	err := c.cc.Invoke(ctx, ConfigService_GetCompares_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *configServiceClient) GetCompare(ctx context.Context, in *GetCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompareResponse)
+	err := c.cc.Invoke(ctx, ConfigService_GetCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *configServiceClient) AddCompare(ctx context.Context, in *AddCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompareResponse)
+	err := c.cc.Invoke(ctx, ConfigService_AddCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *configServiceClient) UpdateCompare(ctx context.Context, in *UpdateCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompareResponse)
+	err := c.cc.Invoke(ctx, ConfigService_UpdateCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *configServiceClient) DeleteCompare(ctx context.Context, in *DeleteCompareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ConfigService_DeleteCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConfigServiceServer is the server API for ConfigService service.
 // All implementations must embed UnimplementedConfigServiceServer
 // for forward compatibility.
@@ -105,6 +165,11 @@ type ConfigServiceServer interface {
 	AddLanguage(context.Context, *AddLanguageRequest) (*LanguageResponse, error)
 	UpdateLanguage(context.Context, *UpdateLanguageRequest) (*LanguageResponse, error)
 	DeleteLanguage(context.Context, *DeleteLanguageRequest) (*emptypb.Empty, error)
+	GetCompares(context.Context, *emptypb.Empty) (*GetComparesResponse, error)
+	GetCompare(context.Context, *GetCompareRequest) (*CompareResponse, error)
+	AddCompare(context.Context, *AddCompareRequest) (*CompareResponse, error)
+	UpdateCompare(context.Context, *UpdateCompareRequest) (*CompareResponse, error)
+	DeleteCompare(context.Context, *DeleteCompareRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedConfigServiceServer()
 }
 
@@ -129,6 +194,21 @@ func (UnimplementedConfigServiceServer) UpdateLanguage(context.Context, *UpdateL
 }
 func (UnimplementedConfigServiceServer) DeleteLanguage(context.Context, *DeleteLanguageRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteLanguage not implemented")
+}
+func (UnimplementedConfigServiceServer) GetCompares(context.Context, *emptypb.Empty) (*GetComparesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCompares not implemented")
+}
+func (UnimplementedConfigServiceServer) GetCompare(context.Context, *GetCompareRequest) (*CompareResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCompare not implemented")
+}
+func (UnimplementedConfigServiceServer) AddCompare(context.Context, *AddCompareRequest) (*CompareResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddCompare not implemented")
+}
+func (UnimplementedConfigServiceServer) UpdateCompare(context.Context, *UpdateCompareRequest) (*CompareResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCompare not implemented")
+}
+func (UnimplementedConfigServiceServer) DeleteCompare(context.Context, *DeleteCompareRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteCompare not implemented")
 }
 func (UnimplementedConfigServiceServer) mustEmbedUnimplementedConfigServiceServer() {}
 func (UnimplementedConfigServiceServer) testEmbeddedByValue()                       {}
@@ -241,6 +321,96 @@ func _ConfigService_DeleteLanguage_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConfigService_GetCompares_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConfigServiceServer).GetCompares(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConfigService_GetCompares_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConfigServiceServer).GetCompares(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConfigService_GetCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConfigServiceServer).GetCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConfigService_GetCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConfigServiceServer).GetCompare(ctx, req.(*GetCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConfigService_AddCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConfigServiceServer).AddCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConfigService_AddCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConfigServiceServer).AddCompare(ctx, req.(*AddCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConfigService_UpdateCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConfigServiceServer).UpdateCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConfigService_UpdateCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConfigServiceServer).UpdateCompare(ctx, req.(*UpdateCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConfigService_DeleteCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConfigServiceServer).DeleteCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConfigService_DeleteCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConfigServiceServer).DeleteCompare(ctx, req.(*DeleteCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConfigService_ServiceDesc is the grpc.ServiceDesc for ConfigService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -268,7 +438,27 @@ var ConfigService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "DeleteLanguage",
 			Handler:    _ConfigService_DeleteLanguage_Handler,
 		},
+		{
+			MethodName: "GetCompares",
+			Handler:    _ConfigService_GetCompares_Handler,
+		},
+		{
+			MethodName: "GetCompare",
+			Handler:    _ConfigService_GetCompare_Handler,
+		},
+		{
+			MethodName: "AddCompare",
+			Handler:    _ConfigService_AddCompare_Handler,
+		},
+		{
+			MethodName: "UpdateCompare",
+			Handler:    _ConfigService_UpdateCompare_Handler,
+		},
+		{
+			MethodName: "DeleteCompare",
+			Handler:    _ConfigService_DeleteCompare_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "config/v1/config.proto",
+	Metadata: "config/v1/service.proto",
 }
