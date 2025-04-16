@@ -1,21 +1,18 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path"
 
 	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
 	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/models"
 	"github.com/CSKU-Lab/go-grader/services"
+	"github.com/CSKU-Lab/go-grader/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -132,106 +129,61 @@ func setupLanguages(languages []*pb.Language) {
 func setupCompares(compares []*pb.CompareResponse) {
 	comparePath := "/var/lib/worker/compares"
 
+	isolateService := services.NewIsolateService(context.Background())
 	for _, compare := range compares {
-		comparePath := path.Join(comparePath, compare.GetId())
-		err := os.Mkdir(comparePath, 0755)
-		if err != nil {
-			log.Fatalln("Cannot create compare directory")
-		}
+		go func() {
+			runner := isolateService.NewInstance()
 
-		tmpPath := fmt.Sprintf("/tmp/%s", compare.GetId())
-		exePath, err := buildCompareScript(tmpPath, compare)
-		if err != nil {
-			log.Fatalf("Cannot build compare script for %s : %s", compare.GetId(), err)
-		}
+			comparePath := path.Join(comparePath, compare.GetId())
+			err := os.Mkdir(comparePath, 0755)
+			if err != nil {
+				log.Fatalln("Cannot create compare directory")
+			}
 
-		scriptPath := path.Join(comparePath, compare.GetId())
-		err = moveFile(exePath, scriptPath)
-		if err != nil {
-			log.Fatalf("Cannot move compare script %s : %s", compare.GetId(), err)
-		}
+			exePath, err := buildCompareScript(runner, compare)
+			if err != nil {
+				log.Fatalf("Cannot build compare script for %s : %s", compare.GetId(), err)
+			}
 
-		err = os.RemoveAll(tmpPath)
-		if err != nil {
-			log.Fatalf("Cannot remove tmp directory of %s : %s", compare.GetId(), err)
-		}
+			scriptPath := path.Join(comparePath, compare.GetId())
+			err = utils.MoveFile(exePath, scriptPath)
+			if err != nil {
+				log.Fatalf("Cannot move compare script %s : %s", compare.GetId(), err)
+			}
 
-		runScriptPath := path.Join(comparePath, "run_script.sh")
-		err = createRunScript(runScriptPath, compare.GetRunScript())
-		if err != nil {
-			log.Fatalf("Cannot create run_script.sh of %s : %s", compare.GetId(), err)
-		}
-
-		log.Printf("✅ %s setup completed", compare.GetId())
+			runScriptPath := path.Join(comparePath, "run_script.sh")
+			err = createRunScript(runScriptPath, compare.GetRunScript())
+			if err != nil {
+				log.Fatalf("Cannot create run_script.sh of %s : %s", compare.GetId(), err)
+			}
+			runner.Cleanup()
+			log.Printf("✅ %s setup completed", compare.GetId())
+		}()
 	}
 	log.Println("Finish setup compares config. :D")
 }
 
-func buildCompareScript(tmpPath string, compare *pb.CompareResponse) (string, error) {
-	err := os.Mkdir(tmpPath, 0705)
-	if err != nil {
-		return "", err
-	}
-
+func buildCompareScript(runner *services.IsolateInstance, compare *pb.CompareResponse) (string, error) {
 	scriptName := fmt.Sprintf("%s.cpp", compare.GetName())
-	scriptPath := path.Join(tmpPath, scriptName)
-	err = os.WriteFile(scriptPath, []byte(compare.GetScript()), 0755)
+	err := runner.CreateFile(scriptName, compare.GetScript())
 	if err != nil {
-		return "", err
+		return "", nil
 	}
 
-	buildScriptPath := path.Join(tmpPath, "build_script.sh")
-	err = os.WriteFile(buildScriptPath, []byte(compare.GetBuildScript()), 0755)
+	err = runner.CreateFile("build_script.sh", compare.GetBuildScript())
 	if err != nil {
-		return "", err
+		return "", nil
 	}
 
-	cmd := exec.Command("/bin/sh", "-c", buildScriptPath)
-	var stdErr bytes.Buffer
-	cmd.Stderr = &stdErr
-	cmd.Dir = tmpPath
-
-	err = cmd.Run()
+	err = runner.Run([]string{"/bin/sh", "-c", "./build_script.sh"}, nil, false)
 	if err != nil {
-		return "", errors.New(stdErr.String())
+		return "", nil
 	}
 
-	exePath := path.Join(tmpPath, compare.GetName())
-
+	exePath := path.Join(runner.BoxPath(), compare.GetId())
 	return exePath, nil
 }
 
 func createRunScript(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0755)
-}
-
-func moveFile(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		return err
-	}
-
-	srcInfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	err = os.Chmod(dst, srcInfo.Mode())
-	if err != nil {
-		return err
-	}
-
-	return os.Remove(src)
 }

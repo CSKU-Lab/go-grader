@@ -28,7 +28,7 @@ func NewIsolateService(ctx context.Context) *IsolateService {
 	return &IsolateService{ctx: ctx, boxIds: boxIds}
 }
 
-type isolateInstance struct {
+type IsolateInstance struct {
 	ctx          context.Context
 	boxID        int
 	boxPath      string
@@ -36,11 +36,11 @@ type isolateInstance struct {
 	boxIds       chan int
 }
 
-func (s *IsolateService) NewInstance() *isolateInstance {
+func (s *IsolateService) NewInstance() *IsolateInstance {
 	boxID := <-s.boxIds
 	metadataPath := fmt.Sprintf("/tmp/box_%d_metadata", boxID)
 
-	instance := isolateInstance{
+	instance := IsolateInstance{
 		ctx:          s.ctx,
 		boxID:        boxID,
 		boxPath:      fmt.Sprintf(constants.BOX_PATH, boxID),
@@ -52,11 +52,11 @@ func (s *IsolateService) NewInstance() *isolateInstance {
 	return &instance
 }
 
-func (i *isolateInstance) log(format string, args ...any) {
+func (i *IsolateInstance) log(format string, args ...any) {
 	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
-func (s *isolateInstance) execute(args ...string) (*bytes.Buffer, error) {
+func (s *IsolateInstance) execute(args ...string) (*bytes.Buffer, error) {
 	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
 	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
 	var stdOut bytes.Buffer
@@ -70,17 +70,21 @@ func (s *isolateInstance) execute(args ...string) (*bytes.Buffer, error) {
 	return &stdOut, nil
 }
 
-func (i *isolateInstance) init() error {
+func (i *IsolateInstance) init() error {
 	i.log("Initializing sandbox...")
 	_, err := i.execute("--init")
 	return err
 }
 
-func (i *isolateInstance) ID() int {
+func (i *IsolateInstance) ID() int {
 	return i.boxID
 }
 
-func (i *isolateInstance) Cleanup() error {
+func (i *IsolateInstance) BoxPath() string {
+	return i.boxPath
+}
+
+func (i *IsolateInstance) Cleanup() error {
 	i.log("Cleaning up sandbox...")
 	_, err := i.execute("--cleanup")
 	if err == nil {
@@ -89,18 +93,19 @@ func (i *isolateInstance) Cleanup() error {
 	return err
 }
 
-func (i *isolateInstance) CreateFile(name string, content string) error {
+func (i *IsolateInstance) CreateFile(name string, content string) error {
 	i.log("Creating file %s...", name)
 	filePath := fmt.Sprintf("%s/%s", i.boxPath, name)
-	return os.WriteFile(filePath, []byte(content), 0644)
+	return os.WriteFile(filePath, []byte(content), 0755)
 }
 
-func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput bool) error {
+func (i *IsolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput bool) error {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
 	args := []string{
 		"--meta=" + i.metadataPath,
+		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"--processes=100",
 		"--stdout=stdout",
 		"--stderr=stderr",
@@ -120,17 +125,17 @@ func (i *isolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput 
 	return err
 }
 
-func (i *isolateInstance) GetOutput() (string, error) {
+func (i *IsolateInstance) GetOutput() (string, error) {
 	i.log("Getting stdout...")
 	return i.catFile("stdout")
 }
 
-func (i *isolateInstance) GetError() (string, error) {
+func (i *IsolateInstance) GetError() (string, error) {
 	i.log("Getting stderror...")
 	return i.catFile("stderr")
 }
 
-func (i *isolateInstance) catFile(fileName string) (string, error) {
+func (i *IsolateInstance) catFile(fileName string) (string, error) {
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
 
@@ -146,7 +151,7 @@ func (i *isolateInstance) catFile(fileName string) (string, error) {
 	return stdOut.String(), nil
 }
 
-func (i *isolateInstance) getMetadata() (string, error) {
+func (i *IsolateInstance) getMetadata() (string, error) {
 	i.log("Getting Metadata...")
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
@@ -163,7 +168,7 @@ func (i *isolateInstance) getMetadata() (string, error) {
 	return stdOut.String(), nil
 }
 
-func (i *isolateInstance) GetMetadata() (*models.Metadata, error) {
+func (i *IsolateInstance) GetMetadata() (*models.Metadata, error) {
 	metadata, err := i.getMetadata()
 	if err != nil {
 		return nil, err
