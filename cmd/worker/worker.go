@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"sync"
 
 	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
 	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
@@ -31,9 +32,13 @@ func main() {
 
 	compareRes, err := grpc.GetCompares(ctx, &emptypb.Empty{})
 
+	var wg sync.WaitGroup
+
 	setupConfigDir()
-	setupLanguages(langRes.Languages)
-	setupCompares(compareRes.Compares)
+	wg.Add(2)
+	go setupLanguages(&wg, langRes.Languages)
+	go setupCompares(&wg, compareRes.Compares)
+	wg.Wait()
 
 	q, err := queue.NewRabbitMQ()
 	if err != nil {
@@ -44,6 +49,8 @@ func main() {
 	compileService := services.NewCompileService(ctx)
 	languageService := services.NewLanguageConfigService()
 	runnerService := services.NewRunnerService(isolateService, compileService, languageService)
+
+	log.Println("Worker is ready to start working 🤖...")
 
 	q.Consume(ctx, "execution", func(message []byte) {
 		execution := &models.Execution{}
@@ -96,42 +103,51 @@ func setupConfigDir() {
 	log.Println("Config directory is created.")
 }
 
-func setupLanguages(languages []*pb.Language) {
+func setupLanguages(wg *sync.WaitGroup, languages []*pb.Language) {
+	defer wg.Done()
 	langPath := "/var/lib/worker/languages"
 
 	for _, lang := range languages {
-		langDir := path.Join(langPath, lang.GetId())
-		err := os.Mkdir(langDir, 0755)
-		if err != nil {
-			log.Fatalf("Cannot create %s config directory : %s", lang.Id, err)
-		}
-
-		if lang.GetBuildScript() != "" {
-			buildPath := path.Join(langDir, "build_script.sh")
-			err := os.WriteFile(buildPath, []byte(lang.GetBuildScript()), 0755)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			langDir := path.Join(langPath, lang.GetId())
+			err := os.Mkdir(langDir, 0755)
 			if err != nil {
-				log.Fatalf("Cannot write %s build_script.sh : %s", lang.GetId(), err)
+				log.Fatalf("Cannot create %s config directory : %s", lang.Id, err)
 			}
-		}
 
-		if lang.GetRunScript() != "" {
-			runPath := path.Join(langDir, "run_script.sh")
-			err := os.WriteFile(runPath, []byte(lang.GetRunScript()), 0757)
-			if err != nil {
-				log.Fatalf("Cannot write %s run_script.sh : %s", lang.GetId(), err)
+			if lang.GetBuildScript() != "" {
+				buildPath := path.Join(langDir, "build_script.sh")
+				err := os.WriteFile(buildPath, []byte(lang.GetBuildScript()), 0755)
+				if err != nil {
+					log.Fatalf("Cannot write %s build_script.sh : %s", lang.GetId(), err)
+				}
 			}
-		}
-		log.Printf("✅ %s setup completed", lang.GetId())
+
+			if lang.GetRunScript() != "" {
+				runPath := path.Join(langDir, "run_script.sh")
+				err := os.WriteFile(runPath, []byte(lang.GetRunScript()), 0757)
+				if err != nil {
+					log.Fatalf("Cannot write %s run_script.sh : %s", lang.GetId(), err)
+				}
+			}
+			log.Printf("✅ %s setup completed", lang.GetId())
+		}()
 	}
+
 	log.Println("Finish setup languages config. :D")
 }
 
-func setupCompares(compares []*pb.CompareResponse) {
+func setupCompares(wg *sync.WaitGroup, compares []*pb.CompareResponse) {
+	defer wg.Done()
 	comparePath := "/var/lib/worker/compares"
 
 	isolateService := services.NewIsolateService(context.Background())
 	for _, compare := range compares {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			runner := isolateService.NewInstance()
 
 			comparePath := path.Join(comparePath, compare.GetId())
@@ -160,6 +176,7 @@ func setupCompares(compares []*pb.CompareResponse) {
 			log.Printf("✅ %s setup completed", compare.GetId())
 		}()
 	}
+
 	log.Println("Finish setup compares config. :D")
 }
 
