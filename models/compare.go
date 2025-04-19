@@ -1,8 +1,9 @@
 package models
 
-type LanguageConfig struct {
+type CompareConfig struct {
 	ID          string
-	Files       []string
+	Files       []File
 	BuildScript string
 	RunScript   string
+	RunName     string
 }

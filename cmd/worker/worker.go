@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"os"
-	"path"
-	"sync"
 
 	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
 	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/models"
 	"github.com/CSKU-Lab/go-grader/services"
-	"github.com/CSKU-Lab/go-grader/utils"
+	"github.com/CSKU-Lab/go-grader/setup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -31,13 +28,10 @@ func main() {
 
 	compareRes, err := grpc.GetCompares(ctx, &emptypb.Empty{})
 
-	var wg sync.WaitGroup
+	languages := langPbToModel(langRes.Languages)
+	compares := comparePbToModel(compareRes.Compares)
 
-	setupConfigDir()
-	wg.Add(2)
-	go setupLanguages(&wg, langRes.Languages)
-	go setupCompares(&wg, compareRes.Compares)
-	wg.Wait()
+	setup.Init(languages, compares)
 
 	q, err := queue.NewRabbitMQ()
 	if err != nil {
@@ -45,26 +39,24 @@ func main() {
 	}
 
 	isolateService := services.NewIsolateService(ctx)
-	compileService := services.NewCompileService(ctx)
-	languageService := services.NewLanguageConfigService()
-	runnerService := services.NewRunnerService(isolateService, compileService, languageService)
+	runnerService := services.NewRunnerService(isolateService)
 
 	log.Println("Worker is ready to start working 🤖...")
 
-	q.Consume(ctx, "running", func(message []byte) {
-		execution := &models.Execution{}
-
-		err := json.Unmarshal(message, execution)
-		if err != nil {
-			log.Fatalln("Cannot unmarshal message")
-		}
-		stdOut, stdErr, metadata, err := runnerService.Run(execution)
-		if err != nil {
-			log.Fatalln("Error from runner ", err)
-		}
-
-		log.Println(stdOut, stdErr, metadata)
-	})
+	// q.Consume(ctx, "running", func(message []byte) {
+	// 	execution := &models.Execution{}
+	//
+	// 	err := json.Unmarshal(message, execution)
+	// 	if err != nil {
+	// 		log.Fatalln("Cannot unmarshal message")
+	// 	}
+	// 	stdOut, stdErr, metadata, err := runnerService.Run(execution)
+	// 	if err != nil {
+	// 		log.Fatalln("Error from runner ", err)
+	// 	}
+	//
+	// 	log.Println(stdOut, stdErr, metadata)
+	// })
 
 	q.Consume(ctx, "execution", func(message []byte) {
 		execution := &models.Execution{}
@@ -95,125 +87,35 @@ func initgRPCClient() (client pb.ConfigServiceClient, close func()) {
 	}
 }
 
-func setupConfigDir() {
-	configPath := "/var/lib/worker"
-	err := os.MkdirAll(configPath, 0755)
-	if err != nil {
-		log.Fatalln("Cannot create config directory : ", err)
-	}
-
-	langPath := "/var/lib/worker/languages"
-	err = os.Mkdir(langPath, 0755)
-	if err != nil {
-		log.Fatalln("Cannot create languages directory")
-	}
-
-	comparePath := "/var/lib/worker/compares"
-	err = os.Mkdir(comparePath, 0755)
-	if err != nil {
-		log.Fatalln("Cannot create compares directory")
-	}
-
-	log.Println("Config directory is created.")
-}
-
-func setupLanguages(wg *sync.WaitGroup, languages []*pb.Language) {
-	defer wg.Done()
-	langPath := "/var/lib/worker/languages"
-
+func langPbToModel(languages []*pb.Language) []models.LanguageConfig {
+	_languages := make([]models.LanguageConfig, 10)
 	for _, lang := range languages {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			langDir := path.Join(langPath, lang.GetId())
-			err := os.Mkdir(langDir, 0755)
-			if err != nil {
-				log.Fatalf("Cannot create %s config directory : %s", lang.Id, err)
-			}
-
-			if lang.GetBuildScript() != "" {
-				buildPath := path.Join(langDir, "build_script.sh")
-				err := os.WriteFile(buildPath, []byte(lang.GetBuildScript()), 0755)
-				if err != nil {
-					log.Fatalf("Cannot write %s build_script.sh : %s", lang.GetId(), err)
-				}
-			}
-
-			if lang.GetRunScript() != "" {
-				runPath := path.Join(langDir, "run_script.sh")
-				err := os.WriteFile(runPath, []byte(lang.GetRunScript()), 0757)
-				if err != nil {
-					log.Fatalf("Cannot write %s run_script.sh : %s", lang.GetId(), err)
-				}
-			}
-			log.Printf("✅ %s setup completed", lang.GetId())
-		}()
+		_languages = append(_languages, models.LanguageConfig{
+			ID:          lang.GetId(),
+			BuildScript: lang.GetBuildScript(),
+			RunScript:   lang.GetRunScript(),
+			Files:       lang.GetFileNames(),
+		})
 	}
-
-	log.Println("Finish setup languages config. :D")
+	return _languages
 }
 
-func setupCompares(wg *sync.WaitGroup, compares []*pb.CompareResponse) {
-	defer wg.Done()
-	comparePath := "/var/lib/worker/compares"
-
-	isolateService := services.NewIsolateService(context.Background())
+func comparePbToModel(compares []*pb.CompareResponse) []models.CompareConfig {
+	_compares := make([]models.CompareConfig, 10)
 	for _, compare := range compares {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			runner := isolateService.NewInstance()
 
-			comparePath := path.Join(comparePath, compare.GetId())
-			err := os.Mkdir(comparePath, 0755)
-			if err != nil {
-				log.Fatalln("Cannot create compare directory")
-			}
+		files := make([]models.File, 10)
+		for _, file := range compare.GetFiles() {
+			files = append(files, models.File{
+				Name:    file.GetName(),
+				Content: file.GetContent(),
+			})
+		}
 
-			exePath, err := buildCompareScript(runner, compare)
-			if err != nil {
-				log.Fatalf("Cannot build compare script for %s : %s", compare.GetId(), err)
-			}
-
-			scriptPath := path.Join(comparePath, compare.GetRunName())
-			err = utils.MoveFile(exePath, scriptPath)
-			if err != nil {
-				log.Fatalf("Cannot move compare script %s : %s", compare.GetId(), err)
-			}
-
-			runScriptPath := path.Join(comparePath, "run_script.sh")
-			err = createRunScript(runScriptPath, compare.GetRunScript())
-			if err != nil {
-				log.Fatalf("Cannot create run_script.sh of %s : %s", compare.GetId(), err)
-			}
-			runner.Cleanup()
-			log.Printf("✅ %s setup completed", compare.GetId())
-		}()
+		_compares = append(_compares, models.CompareConfig{
+			ID:    compare.GetId(),
+			Files: files,
+		})
 	}
-
-	log.Println("Finish setup compares config. :D")
-}
-
-func buildCompareScript(runner *services.IsolateInstance, compare *pb.CompareResponse) (string, error) {
-	err := runner.CreateFile(compare.GetScriptName(), compare.GetScript())
-	if err != nil {
-		return "", nil
-	}
-
-	err = runner.CreateFile("build_script.sh", compare.GetBuildScript())
-	if err != nil {
-		return "", nil
-	}
-
-	err = runner.Run([]string{"/bin/sh", "-c", "./build_script.sh"}, nil, false)
-	if err != nil {
-		return "", nil
-	}
-
-	exePath := path.Join(runner.BoxPath(), compare.GetRunName())
-	return exePath, nil
-}
-
-func createRunScript(path, content string) error {
-	return os.WriteFile(path, []byte(content), 0755)
+	return _compares
 }

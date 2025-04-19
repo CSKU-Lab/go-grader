@@ -184,6 +184,7 @@ type Language struct {
 	Version       *string                `protobuf:"bytes,3,opt,name=version,proto3,oneof" json:"version,omitempty"`
 	BuildScript   string                 `protobuf:"bytes,4,opt,name=build_script,json=buildScript,proto3" json:"build_script,omitempty"`
 	RunScript     string                 `protobuf:"bytes,5,opt,name=run_script,json=runScript,proto3" json:"run_script,omitempty"`
+	FileNames     []string               `protobuf:"bytes,6,rep,name=file_names,json=fileNames,proto3" json:"file_names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -253,6 +254,13 @@ func (x *Language) GetRunScript() string {
 	return ""
 }
 
+func (x *Language) GetFileNames() []string {
+	if x != nil {
+		return x.FileNames
+	}
+	return nil
+}
+
 type LanguageResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -260,6 +268,7 @@ type LanguageResponse struct {
 	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
 	BuildScript   *string                `protobuf:"bytes,4,opt,name=build_script,json=buildScript,proto3,oneof" json:"build_script,omitempty"`
 	RunScript     string                 `protobuf:"bytes,5,opt,name=run_script,json=runScript,proto3" json:"run_script,omitempty"`
+	FileNames     []string               `protobuf:"bytes,6,rep,name=file_names,json=fileNames,proto3" json:"file_names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -329,12 +338,20 @@ func (x *LanguageResponse) GetRunScript() string {
 	return ""
 }
 
+func (x *LanguageResponse) GetFileNames() []string {
+	if x != nil {
+		return x.FileNames
+	}
+	return nil
+}
+
 type AddLanguageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	BuildScript   *string                `protobuf:"bytes,3,opt,name=build_script,json=buildScript,proto3,oneof" json:"build_script,omitempty"`
 	RunScript     string                 `protobuf:"bytes,4,opt,name=run_script,json=runScript,proto3" json:"run_script,omitempty"`
+	FileNames     []string               `protobuf:"bytes,5,rep,name=file_names,json=fileNames,proto3" json:"file_names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -397,6 +414,13 @@ func (x *AddLanguageRequest) GetRunScript() string {
 	return ""
 }
 
+func (x *AddLanguageRequest) GetFileNames() []string {
+	if x != nil {
+		return x.FileNames
+	}
+	return nil
+}
+
 type UpdateLanguageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -404,6 +428,7 @@ type UpdateLanguageRequest struct {
 	Version       *string                `protobuf:"bytes,3,opt,name=version,proto3,oneof" json:"version,omitempty"`
 	BuildScript   *string                `protobuf:"bytes,4,opt,name=build_script,json=buildScript,proto3,oneof" json:"build_script,omitempty"`
 	RunScript     *string                `protobuf:"bytes,5,opt,name=run_script,json=runScript,proto3,oneof" json:"run_script,omitempty"`
+	FileNames     []string               `protobuf:"bytes,6,rep,name=file_names,json=fileNames,proto3" json:"file_names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -473,6 +498,13 @@ func (x *UpdateLanguageRequest) GetRunScript() string {
 	return ""
 }
 
+func (x *UpdateLanguageRequest) GetFileNames() []string {
+	if x != nil {
+		return x.FileNames
+	}
+	return nil
+}
+
 type DeleteLanguageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -530,39 +562,47 @@ const file_config_v1_languages_proto_rawDesc = "" +
 	"\x12GetLanguageRequest\x12\x0e\n" +
 	"\x02id\x18\x04 \x01(\tR\x02id\x12!\n" +
 	"\finclude_name\x18\x05 \x01(\bR\vincludeName\x12'\n" +
-	"\x0finclude_version\x18\x06 \x01(\bR\x0eincludeVersionJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04\"\xa9\x01\n" +
+	"\x0finclude_version\x18\x06 \x01(\bR\x0eincludeVersionJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04\"\xc8\x01\n" +
 	"\bLanguage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x03 \x01(\tH\x01R\aversion\x88\x01\x01\x12!\n" +
 	"\fbuild_script\x18\x04 \x01(\tR\vbuildScript\x12\x1d\n" +
 	"\n" +
-	"run_script\x18\x05 \x01(\tR\trunScriptB\a\n" +
+	"run_script\x18\x05 \x01(\tR\trunScript\x12\x1d\n" +
+	"\n" +
+	"file_names\x18\x06 \x03(\tR\tfileNamesB\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
-	"\b_version\"\xa8\x01\n" +
+	"\b_version\"\xc7\x01\n" +
 	"\x10LanguageResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\tR\aversion\x12&\n" +
 	"\fbuild_script\x18\x04 \x01(\tH\x00R\vbuildScript\x88\x01\x01\x12\x1d\n" +
 	"\n" +
-	"run_script\x18\x05 \x01(\tR\trunScriptB\x0f\n" +
-	"\r_build_script\"\x9a\x01\n" +
+	"run_script\x18\x05 \x01(\tR\trunScript\x12\x1d\n" +
+	"\n" +
+	"file_names\x18\x06 \x03(\tR\tfileNamesB\x0f\n" +
+	"\r_build_script\"\xb9\x01\n" +
 	"\x12AddLanguageRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12&\n" +
 	"\fbuild_script\x18\x03 \x01(\tH\x00R\vbuildScript\x88\x01\x01\x12\x1d\n" +
 	"\n" +
-	"run_script\x18\x04 \x01(\tR\trunScriptB\x0f\n" +
-	"\r_build_script\"\xe0\x01\n" +
+	"run_script\x18\x04 \x01(\tR\trunScript\x12\x1d\n" +
+	"\n" +
+	"file_names\x18\x05 \x03(\tR\tfileNamesB\x0f\n" +
+	"\r_build_script\"\xff\x01\n" +
 	"\x15UpdateLanguageRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x03 \x01(\tH\x01R\aversion\x88\x01\x01\x12&\n" +
 	"\fbuild_script\x18\x04 \x01(\tH\x02R\vbuildScript\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"run_script\x18\x05 \x01(\tH\x03R\trunScript\x88\x01\x01B\a\n" +
+	"run_script\x18\x05 \x01(\tH\x03R\trunScript\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"file_names\x18\x06 \x03(\tR\tfileNamesB\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
 	"\b_versionB\x0f\n" +

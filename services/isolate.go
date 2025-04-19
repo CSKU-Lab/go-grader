@@ -47,6 +47,7 @@ func (s *IsolateService) NewInstance() *IsolateInstance {
 		metadataPath: metadataPath,
 		boxIds:       s.boxIds,
 	}
+
 	instance.init()
 
 	return &instance
@@ -56,7 +57,11 @@ func (i *IsolateInstance) log(format string, args ...any) {
 	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
-func (s *IsolateInstance) execute(args ...string) (*bytes.Buffer, error) {
+func (i *IsolateInstance) logFatalf(format string, args ...any) {
+	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
+}
+
+func (s *IsolateInstance) execute(args ...string) (string, error) {
 	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
 	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
 	var stdOut bytes.Buffer
@@ -65,15 +70,20 @@ func (s *IsolateInstance) execute(args ...string) (*bytes.Buffer, error) {
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 
-	cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		return "", errors.New(stdErr.String())
+	}
 
-	return &stdOut, nil
+	return stdOut.String(), nil
 }
 
-func (i *IsolateInstance) init() error {
+func (i *IsolateInstance) init() {
 	i.log("Initializing sandbox...")
 	_, err := i.execute("--init")
-	return err
+	if err != nil {
+		i.logFatalf("Error on init: %s", err)
+	}
 }
 
 func (i *IsolateInstance) ID() int {
@@ -99,13 +109,31 @@ func (i *IsolateInstance) CreateFile(name string, content string) error {
 	return os.WriteFile(filePath, []byte(content), 0755)
 }
 
+func (i *IsolateInstance) Compile() error {
+	i.log("Compiling program...")
+
+	args := []string{
+		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"--processes=0",
+		"--run",
+		"--",
+		"build_script.sh",
+	}
+
+	_, err := i.execute(args...)
+	if err != nil {
+		i.log("Compile error : %s", err.Error())
+	}
+
+	return err
+}
+
 func (i *IsolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput bool) error {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
 	args := []string{
 		"--meta=" + i.metadataPath,
-		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"--processes=100",
 		"--stdout=stdout",
 		"--stderr=stderr",

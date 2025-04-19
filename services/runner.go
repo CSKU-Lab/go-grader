@@ -1,23 +1,16 @@
 package services
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/CSKU-Lab/go-grader/models"
 )
 
 type runnerService struct {
-	isolateService    *IsolateService
-	compileService    *CompileService
-	langConfigService *LanguageConfigService
+	isolateService *IsolateService
 }
 
-func NewRunnerService(isolateService *IsolateService, compileService *CompileService, langConfigService *LanguageConfigService) *runnerService {
+func NewRunnerService(isolateService *IsolateService) *runnerService {
 	return &runnerService{
-		isolateService:    isolateService,
-		compileService:    compileService,
-		langConfigService: langConfigService,
+		isolateService: isolateService,
 	}
 }
 
@@ -25,32 +18,30 @@ func (r *runnerService) Run(e *models.Execution) (string, string, *models.Metada
 	instance := r.isolateService.NewInstance()
 	defer instance.Cleanup()
 
-	config := r.langConfigService.Get(e.LanguageID, instance.ID())
-
-	for _, file := range config.SandboxFiles {
-		err := instance.CreateFile(file, e.Code)
-		if err != nil {
-			return "", "", nil, err
-		}
-	}
-
-	if len(config.CompileScript) != 0 {
-		err := r.compileService.Compile(config.CompileScript)
-		if err != nil {
-			return "", "", nil, errors.New(fmt.Sprintf("Error on compile: %s", err))
-		}
-	}
-
+	// for _, file := range config.SandboxFiles {
+	// 	err := instance.CreateFile(file, e.Code)
+	// 	if err != nil {
+	// 		return "", "", nil, err
+	// 	}
+	// }
+	//
+	// if len(config.CompileScript) != 0 {
+	// 	err := instance.Compile()
+	// 	if err != nil {
+	// 		return "", "", nil, errors.New(fmt.Sprintf("Error on compile: %s", err))
+	// 	}
+	// }
+	//
 	// // If has input
 	// err = instance.CreateFile("input", "1")
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
 
-	err := instance.Run(config.RunScript, nil, false)
-	if err != nil {
-		return "", "", nil, err
-	}
+	// err := instance.Run(config.RunScript, nil, false)
+	// if err != nil {
+	// 	return "", "", nil, err
+	// }
 
 	stdOut, err := instance.GetOutput()
 	if err != nil {
