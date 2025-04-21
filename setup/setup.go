@@ -7,9 +7,15 @@ import (
 	"path"
 	"sync"
 
+	"github.com/CSKU-Lab/go-grader/constants"
 	"github.com/CSKU-Lab/go-grader/models"
 	"github.com/CSKU-Lab/go-grader/services"
 	"github.com/CSKU-Lab/go-grader/utils"
+)
+
+const (
+	LANGPATH    = constants.CONFIG_DIR + "/languages"
+	COMPAREPATH = constants.CONFIG_DIR + "/compares"
 )
 
 func Init(languages []models.LanguageConfig, compares []models.CompareConfig) {
@@ -23,20 +29,17 @@ func Init(languages []models.LanguageConfig, compares []models.CompareConfig) {
 }
 
 func setupConfigDir() {
-	configPath := "/var/lib/worker"
-	err := os.MkdirAll(configPath, 0755)
+	err := os.MkdirAll(constants.CONFIG_DIR, 0755)
 	if err != nil {
 		log.Fatalln("Cannot create config directory : ", err)
 	}
 
-	langPath := "/var/lib/worker/languages"
-	err = os.Mkdir(langPath, 0755)
+	err = os.Mkdir(LANGPATH, 0755)
 	if err != nil {
 		log.Fatalln("Cannot create languages directory")
 	}
 
-	comparePath := "/var/lib/worker/compares"
-	err = os.Mkdir(comparePath, 0755)
+	err = os.Mkdir(COMPAREPATH, 0755)
 	if err != nil {
 		log.Fatalln("Cannot create compares directory")
 	}
@@ -46,13 +49,12 @@ func setupConfigDir() {
 
 func setupLanguages(wg *sync.WaitGroup, languages []models.LanguageConfig) {
 	defer wg.Done()
-	langPath := "/var/lib/worker/languages"
 
 	for _, lang := range languages {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			langDir := path.Join(langPath, lang.ID)
+			langDir := path.Join(LANGPATH, lang.ID)
 			err := os.Mkdir(langDir, 0755)
 			if err != nil {
 				log.Fatalf("Cannot create %s config directory : %s", lang.ID, err)
@@ -82,7 +84,6 @@ func setupLanguages(wg *sync.WaitGroup, languages []models.LanguageConfig) {
 
 func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 	defer wg.Done()
-	comparePath := "/var/lib/worker/compares"
 
 	isolateService := services.NewIsolateService(context.Background())
 	for _, compare := range compares {
@@ -91,7 +92,7 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 			defer wg.Done()
 			runner := isolateService.NewInstance()
 
-			comparePath := path.Join(comparePath, compare.ID)
+			comparePath := path.Join(COMPAREPATH, compare.ID)
 			err := os.Mkdir(comparePath, 0755)
 			if err != nil {
 				log.Fatalln("Cannot create compare directory")

@@ -20,10 +20,17 @@ func main() {
 	defer rb.Close()
 
 	execution := models.Execution{
-		Code:       `import time
-time.sleep(2
-print("Hello, World!")`,
-		LanguageID: "python_3.8",
+		Files: []models.File{
+			{
+				Name: "main.c",
+				Content: `#include<stdio.h>
+				int main() {
+					printf("Hello World");
+					return 0;
+				}`,
+			},
+		},
+		LanguageID: "C_99",
 	}
 
 	message, err := json.Marshal(&execution)

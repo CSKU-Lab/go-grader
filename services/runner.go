@@ -5,58 +5,68 @@ import (
 )
 
 type runnerService struct {
-	isolateService *IsolateService
+	isolateService  *IsolateService
+	languageService *LanguageService
 }
 
-func NewRunnerService(isolateService *IsolateService) *runnerService {
+func NewRunnerService(isolateService *IsolateService, languageService *LanguageService) *runnerService {
 	return &runnerService{
-		isolateService: isolateService,
+		isolateService:  isolateService,
+		languageService: languageService,
 	}
 }
 
-func (r *runnerService) Run(e *models.Execution) (string, string, *models.Metadata, error) {
+type Result struct {
+	StdOut   string
+	StdErr   string
+	Metadata *models.Metadata
+}
+
+func (r *runnerService) Run(langID string, files []models.File) (*Result, error) {
 	instance := r.isolateService.NewInstance()
 	defer instance.Cleanup()
 
-	// for _, file := range config.SandboxFiles {
-	// 	err := instance.CreateFile(file, e.Code)
-	// 	if err != nil {
-	// 		return "", "", nil, err
-	// 	}
-	// }
-	//
-	// if len(config.CompileScript) != 0 {
-	// 	err := instance.Compile()
-	// 	if err != nil {
-	// 		return "", "", nil, errors.New(fmt.Sprintf("Error on compile: %s", err))
-	// 	}
-	// }
-	//
-	// // If has input
-	// err = instance.CreateFile("input", "1")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	for _, file := range files {
+		if err := instance.CreateFile(file.Name, file.Content); err != nil {
+			return nil, err
+		}
+	}
 
-	// err := instance.Run(config.RunScript, nil, false)
-	// if err != nil {
-	// 	return "", "", nil, err
-	// }
+	language, err := r.languageService.GetByID(langID)
+	if err != nil {
+		return nil, err
+	}
+
+	if language.NeedCompile {
+		err := instance.CompileUsing(language.Path)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = instance.Run(language.Path, nil, false)
+	if err != nil {
+		return nil, err
+	}
 
 	stdOut, err := instance.GetOutput()
 	if err != nil {
-		return "", "", nil, err
+		return nil, err
 	}
 
 	stdErr, err := instance.GetError()
 	if err != nil {
-		return "", "", nil, err
+		return nil, err
 	}
 
 	metadata, err := instance.GetMetadata()
 	if err != nil {
-		return "", "", nil, err
+		return nil, err
 	}
 
-	return stdOut, stdErr, metadata, nil
+	return &Result{
+		StdOut:   stdOut,
+		StdErr:   stdErr,
+		Metadata: metadata,
+	}, nil
 }

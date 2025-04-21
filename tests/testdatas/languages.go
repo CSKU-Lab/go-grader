@@ -9,4 +9,10 @@ var Languages = []models.LanguageConfig{
 		RunScript:   "#!/bin/bash\n\n./main",
 		Files:       []string{"main.c"},
 	},
+	{
+		ID:          "cpp_test",
+		BuildScript: "#!/bin/bash\n\n g++ main.cpp -o main",
+		RunScript:   "#!/bin/bash\n\n./main",
+		Files:       []string{"main.cpp"},
+	},
 }

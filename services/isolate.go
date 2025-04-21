@@ -72,6 +72,14 @@ func (s *IsolateInstance) execute(args ...string) (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// recheck if the command you ran with isolate command is exist
+			if exitErr.ExitCode() == 127 {
+				return "", errors.New("the command you pass to isolate is not exist")
+			}
+		}
+
 		return "", errors.New(stdErr.String())
 	}
 
@@ -125,20 +133,46 @@ func (i *IsolateInstance) Compile() error {
 		i.log("Compile error : %s", err.Error())
 	}
 
+	i.log("Compile done.")
+
 	return err
 }
 
-func (i *IsolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput bool) error {
+func (i *IsolateInstance) CompileUsing(scriptDir string) error {
+	i.log("Compiling program...")
+
+	args := []string{
+		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		fmt.Sprintf("--dir=%s", scriptDir),
+		"--processes=0",
+		"--run",
+		"--",
+		fmt.Sprintf("%s/build_script.sh", scriptDir),
+	}
+
+	_, err := i.execute(args...)
+	if err != nil {
+		i.log("Compile error : %s", err.Error())
+	}
+
+	i.log("Compile done.")
+
+	return err
+}
+
+func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bool) error {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
 	args := []string{
 		"--meta=" + i.metadataPath,
+		fmt.Sprintf("--dir=%s", scriptDir),
 		"--processes=100",
 		"--stdout=stdout",
 		"--stderr=stderr",
 		"--run",
 		"--",
+		fmt.Sprintf("%s/run_script.sh", scriptDir),
 	}
 
 	if hasInput {
@@ -146,7 +180,6 @@ func (i *IsolateInstance) Run(runnerCmd []string, limit *models.Limit, hasInput 
 	}
 
 	args = append(_limits, args...)
-	args = append(args, runnerCmd...)
 
 	_, err := i.execute(args...)
 
