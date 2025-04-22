@@ -15,4 +15,9 @@ var Languages = []models.LanguageConfig{
 		RunScript:   "#!/bin/bash\n\n./main",
 		Files:       []string{"main.cpp"},
 	},
+	{
+		ID:        "python_test",
+		RunScript: "#!/bin/bash\n\npython3 main.py",
+		Files:     []string{"main.py"},
+	},
 }
