@@ -6,7 +6,7 @@ var Compares = []models.CompareConfig{
 	{
 		ID:          "default",
 		BuildScript: "#!/bin/bash\n\ng++ default.cpp -o default",
-		RunScript:   "#!/bin/bash\n\n$SCRIPT input.txt sol_output ./feedback_folder < output",
+		RunScript:   "#!/bin/bash\n\n$SCRIPT input sol_output ./feedback_dir < output",
 		RunName:     "default",
 		Files: []models.File{
 			{

@@ -1,7 +1,9 @@
 package services
 
 import (
+	"errors"
 	"log"
+	"os/exec"
 
 	"github.com/CSKU-Lab/go-grader/models"
 )
@@ -73,14 +75,11 @@ func (r *runner) SetInput(input string) error {
 	return r.instance.CreateFile("input", input, 0644)
 }
 
-func (r *runner) run() (*Result, error) {
-	if r.lang.NeedCompile {
-		err := r.instance.CompileUsing(r.lang.Path)
-		if err != nil {
-			return nil, err
-		}
-	}
+func (r *runner) compile() error {
+	return r.instance.CompileUsing(r.lang.Path)
+}
 
+func (r *runner) run() (*Result, error) {
 	err := r.instance.Run(r.lang.Path, r.limits, r.hasInput)
 	if err != nil {
 		return nil, err
@@ -128,32 +127,66 @@ func (r *runner) SetCompareID(ID string) {
 	r.comparePath = compare.Path
 }
 
-func (r *runner) compare(solOutout string) error {
-	err := r.instance.CreateFile("sol_output", solOutout, 0644)
+func (r *runner) compare(solOutput string) error {
+	err := r.instance.CreateFile("sol_output", solOutput, 0644)
+	if err != nil {
+		return err
+	}
+
+	err = r.instance.CreateDir("feedback_dir", 0755)
 	if err != nil {
 		return err
 	}
 
 	err = r.instance.Run(r.comparePath, nil, false)
 	if err != nil {
-		return err
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitCode() != 43 {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
 func (r *runner) Run() (*Result, error) {
-	result, err := r.run()
-	if err != nil {
-		return nil, err
+	if r.lang.NeedCompile {
+		if err := r.compile(); err != nil {
+			return nil, err
+		}
 	}
 
 	if r.testcases != nil {
 		for _, testCase := range r.testcases {
+			if err := r.SetInput(testCase.Input); err != nil {
+				return nil, err
+			}
+
+			result, err := r.run()
+			if err != nil {
+				return nil, err
+			}
+
+			err = r.instance.CreateFile("output", result.StdOut, 0644)
+			if err != nil {
+				return nil, err
+			}
+
 			if err := r.compare(testCase.Output); err != nil {
 				return nil, err
 			}
+			r.hasInput = false
+			break
 		}
-	}
+		return nil, nil
+	} else {
+		result, err := r.run()
+		if err != nil {
+			return nil, err
+		}
 
-	return result, nil
+		r.hasInput = false
+		return result, nil
+	}
 }

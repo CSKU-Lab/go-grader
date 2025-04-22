@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/CSKU-Lab/go-grader/constants"
@@ -78,7 +79,7 @@ func setupLanguages(wg *sync.WaitGroup, languages []models.LanguageConfig) {
 					log.Fatalf("Cannot write %s run_script.sh : %s", lang.ID, err)
 				}
 			}
-			log.Printf("✅ %s setup completed", lang.ID)
+			log.Printf("%s setup completed ✅", lang.ID)
 		}()
 	}
 }
@@ -111,7 +112,8 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 			}
 
 			runScriptPath := path.Join(comparePath, "run_script.sh")
-			err = createRunScript(runScriptPath, compare.RunScript)
+			scriptPath = path.Join(comparePath, compare.RunName)
+			err = createRunScript(runScriptPath, scriptPath, compare.RunScript)
 			if err != nil {
 				log.Fatalf("Cannot create run_script.sh of %s : %s", compare.ID, err)
 			}
@@ -172,6 +174,12 @@ func buildCompareScript(runner *services.IsolateInstance, compare *models.Compar
 	return exePath, nil
 }
 
-func createRunScript(path, content string) error {
-	return os.WriteFile(path, []byte(content), 0655)
+func createRunScript(runScriptPath, scriptPath, content string) error {
+	replacedContent := replaceEnv(content, scriptPath)
+
+	return os.WriteFile(runScriptPath, []byte(replacedContent), 0655)
+}
+
+func replaceEnv(content, runName string) string {
+	return strings.ReplaceAll(content, "$SCRIPT", runName)
 }

@@ -117,6 +117,12 @@ func (i *IsolateInstance) CreateFile(name string, content string, filePerm os.Fi
 	return os.WriteFile(filePath, []byte(content), filePerm)
 }
 
+func (i *IsolateInstance) CreateDir(name string, filePerm os.FileMode) error {
+	i.log("Creating directory %s...", name)
+	dirPath := fmt.Sprintf("%s/%s", i.boxPath, name)
+	return os.Mkdir(dirPath, filePerm)
+}
+
 func (i *IsolateInstance) Compile() error {
 	i.log("Compiling program...")
 
@@ -168,7 +174,7 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 		"--meta=" + i.metadataPath,
 		fmt.Sprintf("--dir=%s", scriptDir),
 		"--processes=100",
-		"--stdout=output",
+		"--stdout=stdout",
 		"--stderr=stderr",
 		"--run",
 		"--",
@@ -196,7 +202,7 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 
 func (i *IsolateInstance) GetOutput() (string, error) {
 	i.log("Getting stdout...")
-	return i.catFile("output")
+	return i.catFile("stdout")
 }
 
 func (i *IsolateInstance) GetError() (string, error) {

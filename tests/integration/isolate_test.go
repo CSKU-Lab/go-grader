@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/CSKU-Lab/go-grader/models"
 	"github.com/CSKU-Lab/go-grader/services"
@@ -13,7 +12,6 @@ import (
 
 func TestIsolate(t *testing.T) {
 	setup.Init(testdatas.Languages, testdatas.Compares)
-	t.Log("Setup complete")
 
 	isolateService := services.NewIsolateService(context.Background())
 	languageService := services.NewLanguageService()
@@ -45,22 +43,11 @@ func TestIsolate(t *testing.T) {
 		t.Fatalf("Cannot set files: %s", err)
 	}
 
-	err = runner.SetInput("World")
-	if err != nil {
-		t.Fatalf("Cannot set input: %s", err)
-	}
-
 	runner.SetCompareID("default")
 	runner.SetTestCases(testdatas.Tasks[0].TestCases)
 
-	result, err := runner.Run()
+	_, err = runner.Run()
 	if err != nil {
 		t.Fatalf("Cannot run: %s", err)
 	}
-
-	t.Logf("StdOut: %s", result.StdOut)
-	t.Logf("StdErr: %s", result.StdErr)
-	t.Logf("Metadata: %v", result.Metadata)
-
-	time.Sleep(1 * time.Hour)
 }
