@@ -123,6 +123,12 @@ func (i *IsolateInstance) CreateDir(name string, filePerm os.FileMode) error {
 	return os.Mkdir(dirPath, filePerm)
 }
 
+func (i *IsolateInstance) RemoveDir(name string) error {
+	i.log("Removing directory %s...", name)
+	dirPath := fmt.Sprintf("%s/%s", i.boxPath, name)
+	return os.RemoveAll(dirPath)
+}
+
 func (i *IsolateInstance) Compile() error {
 	i.log("Compiling program...")
 

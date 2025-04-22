@@ -147,7 +147,9 @@ func (r *runner) compare(solOutput string) error {
 			}
 		}
 	}
+
 	return nil
+	return r.instance.RemoveDir("feedback_dir")
 }
 
 func (r *runner) Run() (*Result, error) {
