@@ -2,7 +2,7 @@ package testdatas
 
 import "github.com/CSKU-Lab/go-grader/models"
 
-var tasks = []models.Task{
+var Tasks = []models.Task{
 	{
 		ID: "hello_x",
 		LanguageIDs: []string{

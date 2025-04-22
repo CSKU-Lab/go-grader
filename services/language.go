@@ -7,10 +7,11 @@ import (
 	"slices"
 
 	"github.com/CSKU-Lab/go-grader/constants"
+	"github.com/CSKU-Lab/go-grader/models"
 )
 
 type LanguageService struct {
-	languages []Language
+	languages []models.LocalLanguage
 }
 
 func NewLanguageService() *LanguageService {
@@ -25,12 +26,6 @@ func NewLanguageService() *LanguageService {
 
 }
 
-type Language struct {
-	ID          string
-	Path        string
-	NeedCompile bool
-}
-
 func isNeedCompile(langPath string) (bool, error) {
 	entries, err := os.ReadDir(langPath)
 	if err != nil {
@@ -43,7 +38,7 @@ func isNeedCompile(langPath string) (bool, error) {
 
 }
 
-func getLanguages() ([]Language, error) {
+func getLanguages() ([]models.LocalLanguage, error) {
 	LANGDIR := constants.CONFIG_DIR + "/languages"
 
 	entries, err := os.ReadDir(LANGDIR)
@@ -51,7 +46,7 @@ func getLanguages() ([]Language, error) {
 		return nil, err
 	}
 
-	var languages []Language
+	var languages []models.LocalLanguage
 
 	for _, file := range entries {
 		needCompile, err := isNeedCompile(LANGDIR + "/" + file.Name())
@@ -59,7 +54,7 @@ func getLanguages() ([]Language, error) {
 			return nil, err
 		}
 
-		languages = append(languages, Language{
+		languages = append(languages, models.LocalLanguage{
 			ID:          file.Name(),
 			Path:        LANGDIR + "/" + file.Name(),
 			NeedCompile: needCompile,
@@ -69,7 +64,7 @@ func getLanguages() ([]Language, error) {
 	return languages, nil
 }
 
-func (l *LanguageService) GetByID(ID string) (*Language, error) {
+func (l *LanguageService) GetByID(ID string) (*models.LocalLanguage, error) {
 	for _, lang := range l.languages {
 		if lang.ID == ID {
 			return &lang, nil

@@ -111,10 +111,10 @@ func (i *IsolateInstance) Cleanup() error {
 	return err
 }
 
-func (i *IsolateInstance) CreateFile(name string, content string) error {
+func (i *IsolateInstance) CreateFile(name string, content string, filePerm os.FileMode) error {
 	i.log("Creating file %s...", name)
 	filePath := fmt.Sprintf("%s/%s", i.boxPath, name)
-	return os.WriteFile(filePath, []byte(content), 0755)
+	return os.WriteFile(filePath, []byte(content), filePerm)
 }
 
 func (i *IsolateInstance) Compile() error {
@@ -168,7 +168,7 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 		"--meta=" + i.metadataPath,
 		fmt.Sprintf("--dir=%s", scriptDir),
 		"--processes=100",
-		"--stdout=stdout",
+		"--stdout=output",
 		"--stderr=stderr",
 		"--run",
 		"--",
@@ -182,13 +182,21 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 	args = append(_limits, args...)
 
 	_, err := i.execute(args...)
+	if err != nil {
+		stderr, err := i.GetError()
+		if err != nil {
+			return errors.New("Cannot get stderr")
+		}
+
+		return errors.New(stderr)
+	}
 
 	return err
 }
 
 func (i *IsolateInstance) GetOutput() (string, error) {
 	i.log("Getting stdout...")
-	return i.catFile("stdout")
+	return i.catFile("output")
 }
 
 func (i *IsolateInstance) GetError() (string, error) {

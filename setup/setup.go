@@ -2,15 +2,16 @@ package setup
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"path"
 	"sync"
 
 	"github.com/CSKU-Lab/go-grader/constants"
+	"github.com/CSKU-Lab/go-grader/internal/file"
 	"github.com/CSKU-Lab/go-grader/models"
 	"github.com/CSKU-Lab/go-grader/services"
-	"github.com/CSKU-Lab/go-grader/utils"
 )
 
 const (
@@ -26,6 +27,8 @@ func Init(languages []models.LanguageConfig, compares []models.CompareConfig) {
 	go setupLanguages(&wg, languages)
 	go setupCompares(&wg, compares)
 	wg.Wait()
+
+	log.Println("Setup completed. :D")
 }
 
 func setupConfigDir() {
@@ -70,7 +73,7 @@ func setupLanguages(wg *sync.WaitGroup, languages []models.LanguageConfig) {
 
 			if lang.RunScript != "" {
 				runPath := path.Join(langDir, "run_script.sh")
-				err := os.WriteFile(runPath, []byte(lang.RunScript), 0757)
+				err := os.WriteFile(runPath, []byte(lang.RunScript), 0655)
 				if err != nil {
 					log.Fatalf("Cannot write %s run_script.sh : %s", lang.ID, err)
 				}
@@ -78,8 +81,6 @@ func setupLanguages(wg *sync.WaitGroup, languages []models.LanguageConfig) {
 			log.Printf("✅ %s setup completed", lang.ID)
 		}()
 	}
-
-	log.Println("Finish setup languages config. :D")
 }
 
 func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
@@ -104,7 +105,7 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 			}
 
 			scriptPath := path.Join(comparePath, compare.RunName)
-			err = utils.MoveFile(exePath, scriptPath)
+			err = file.MoveFile(exePath, scriptPath)
 			if err != nil {
 				log.Fatalf("Cannot move compare script %s : %s", compare.ID, err)
 			}
@@ -115,22 +116,49 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 				log.Fatalf("Cannot create run_script.sh of %s : %s", compare.ID, err)
 			}
 			runner.Cleanup()
-			log.Printf("✅ %s setup completed", compare.ID)
+			log.Printf("Write %s to compares.json", compare.ID)
+
+			log.Printf("%s setup completed ✅", compare.ID)
 		}()
 	}
 
-	log.Println("Finish setup compares config. :D")
+	writeToComparesJson(compares)
+}
+
+func writeToComparesJson(compares []models.CompareConfig) error {
+	var localCompares []models.LocalCompare
+	for _, compare := range compares {
+		localCompares = append(localCompares, models.LocalCompare{
+			ID:      compare.ID,
+			RunName: compare.RunName,
+			Path:    path.Join(COMPAREPATH, compare.ID),
+		})
+	}
+
+	data, err := json.Marshal(&models.LocalCompareList{
+		Compares: localCompares,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(constants.COMPARE_LIST_PATH, data, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func buildCompareScript(runner *services.IsolateInstance, compare *models.CompareConfig) (string, error) {
 	for _, file := range compare.Files {
-		err := runner.CreateFile(file.Name, file.Content)
+		err := runner.CreateFile(file.Name, file.Content, 0644)
 		if err != nil {
 			return "", err
 		}
 	}
 
-	err := runner.CreateFile("build_script.sh", compare.BuildScript)
+	err := runner.CreateFile("build_script.sh", compare.BuildScript, 0555)
 	if err != nil {
 		return "", err
 	}
@@ -145,5 +173,5 @@ func buildCompareScript(runner *services.IsolateInstance, compare *models.Compar
 }
 
 func createRunScript(path, content string) error {
-	return os.WriteFile(path, []byte(content), 0755)
+	return os.WriteFile(path, []byte(content), 0655)
 }
