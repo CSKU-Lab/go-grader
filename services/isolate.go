@@ -211,28 +211,23 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 
 func (i *IsolateInstance) GetOutput() (string, error) {
 	i.log("Getting stdout...")
-	return i.catFile("stdout")
+
+	data, err := os.ReadFile(i.boxPath + "/stdout")
+	if err != nil {
+		return "", fmt.Errorf("Cannot read metadata file : %s", err)
+	}
+
+	return string(data), nil
 }
 
 func (i *IsolateInstance) GetError() (string, error) {
 	i.log("Getting stderror...")
-	return i.catFile("stderr")
-}
-
-func (i *IsolateInstance) catFile(fileName string) (string, error) {
-	var stdOut bytes.Buffer
-	var stdErr bytes.Buffer
-
-	cmd := exec.CommandContext(i.ctx, "cat", fmt.Sprintf("%s/%s", i.boxPath, fileName))
-	cmd.Stdout = &stdOut
-	cmd.Stderr = &stdErr
-
-	err := cmd.Run()
+	data, err := os.ReadFile(i.boxPath + "/stderr")
 	if err != nil {
-		return "", errors.New(stdErr.String())
+		return "", fmt.Errorf("Cannot read metadata file : %s", err)
 	}
 
-	return stdOut.String(), nil
+	return string(data), nil
 }
 
 func (i *IsolateInstance) getMetadata() (string, error) {
