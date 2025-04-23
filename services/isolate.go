@@ -234,19 +234,12 @@ func (i *IsolateInstance) catFile(fileName string) (string, error) {
 
 func (i *IsolateInstance) getMetadata() (string, error) {
 	i.log("Getting Metadata...")
-	var stdOut bytes.Buffer
-	var stdErr bytes.Buffer
-
-	cmd := exec.CommandContext(i.ctx, "cat", i.metadataPath)
-	cmd.Stdout = &stdOut
-	cmd.Stderr = &stdErr
-
-	err := cmd.Run()
+	data, err := os.ReadFile(i.metadataPath)
 	if err != nil {
-		return "", errors.New(stdErr.String())
+		return "", fmt.Errorf("Cannot read metadata file : %s", err)
 	}
 
-	return stdOut.String(), nil
+	return string(data), nil
 }
 
 func (i *IsolateInstance) GetMetadata() (*models.Metadata, error) {
