@@ -78,8 +78,8 @@ func (s *IsolateInstance) execute(args ...string) (string, error) {
 			if exitErr.ExitCode() == 127 {
 				return "", errors.New("the command you pass to isolate is not exist")
 			}
+			return stdOut.String(), nil
 		}
-
 		return "", errors.New(stdErr.String())
 	}
 
@@ -203,7 +203,7 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 		return errors.New(stderr)
 	}
 
-	return err
+	return nil
 }
 
 func (i *IsolateInstance) GetOutput() (string, error) {
@@ -256,6 +256,14 @@ func (i *IsolateInstance) GetMetadata() (*models.Metadata, error) {
 	}
 
 	return models.ParseMetadata(metadata)
+}
+
+func (i *IsolateInstance) GetCompareResult() (string, error) {
+	data, err := os.ReadFile(i.boxPath + "/compare_result.txt")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func getLimitArgs(limit *models.Limit) []string {
