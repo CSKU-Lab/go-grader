@@ -32,6 +32,13 @@ func Init(languages []models.LanguageConfig, compares []models.CompareConfig) {
 	log.Println("Setup completed. :D")
 }
 
+func Cleanup() {
+	err := os.RemoveAll(constants.CONFIG_DIR)
+	if err != nil {
+		log.Fatalln("Cannot remove config directory : ", err)
+	}
+}
+
 func setupConfigDir() {
 	err := os.MkdirAll(constants.CONFIG_DIR, 0755)
 	if err != nil {
@@ -100,19 +107,29 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 				log.Fatalln("Cannot create compare directory")
 			}
 
-			exePath, err := buildCompareScript(runner, &compare)
-			if err != nil {
-				log.Fatalf("Cannot build compare script for %s : %s", compare.ID, err)
-			}
-
 			scriptPath := path.Join(comparePath, compare.RunName)
-			err = file.MoveFile(exePath, scriptPath)
-			if err != nil {
-				log.Fatalf("Cannot move compare script %s : %s", compare.ID, err)
+
+			if compare.BuildScript != "" {
+				exePath, err := buildCompareScript(runner, &compare)
+				if err != nil {
+					log.Fatalf("Cannot build compare script for %s : %s", compare.ID, err)
+				}
+
+				err = file.MoveFile(exePath, scriptPath)
+				if err != nil {
+					log.Fatalf("Cannot move compare script %s : %s", compare.ID, err)
+				}
+			} else {
+				for _, file := range compare.Files {
+					replacedContent := replaceEnv(file.Content, scriptPath)
+					err := os.WriteFile(path.Join(comparePath, file.Name), []byte(replacedContent), 0655)
+					if err != nil {
+						log.Fatalf("Cannot write %s file %s : %s", compare.ID, file.Name, err)
+					}
+				}
 			}
 
 			runScriptPath := path.Join(comparePath, "run_script.sh")
-			scriptPath = path.Join(comparePath, compare.RunName)
 			err = createRunScript(runScriptPath, scriptPath, compare.RunScript)
 			if err != nil {
 				log.Fatalf("Cannot create run_script.sh of %s : %s", compare.ID, err)
@@ -181,5 +198,5 @@ func createRunScript(runScriptPath, scriptPath, content string) error {
 }
 
 func replaceEnv(content, runName string) string {
-	return strings.ReplaceAll(content, "$SCRIPT", runName)
+	return strings.ReplaceAll(content, "$RUN_NAME", runName)
 }
