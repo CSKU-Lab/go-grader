@@ -1,7 +1,6 @@
 package models
 
 type Task struct {
-	ID          string
-	TestCases   []TestCase
-	LanguageIDs []string
+	ID        string
+	TestCases []TestCase
 }
