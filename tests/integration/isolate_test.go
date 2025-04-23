@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/CSKU-Lab/go-grader/models"
@@ -10,16 +11,21 @@ import (
 	"github.com/CSKU-Lab/go-grader/tests/testdatas"
 )
 
-func TestIsolate(t *testing.T) {
+func initTest() services.RunnerService {
 	setup.Init(testdatas.Languages, testdatas.Compares)
-
 	isolateService := services.NewIsolateService(context.Background())
 	languageService := services.NewLanguageService()
 	compareService := services.NewCompareService()
 	runnerService := services.NewRunnerService(isolateService, languageService, compareService)
 
+	return runnerService
+}
+
+func TestIsolate_RunPassed(t *testing.T) {
+	runnerService := initTest()
 	runner := runnerService.NewRunner()
 	defer runner.Cleanup()
+	defer setup.Cleanup()
 
 	err := runner.SetLanguage("cpp_test")
 	if err != nil {
@@ -43,11 +49,112 @@ func TestIsolate(t *testing.T) {
 		t.Fatalf("Cannot set files: %s", err)
 	}
 
-	runner.SetCompareID("default")
+	runner.SetCompareID("claude_3.7")
 	runner.SetTestCases(testdatas.Tasks[0].TestCases)
 
-	_, err = runner.Run()
+	results, err := runner.Grade()
 	if err != nil {
-		t.Fatalf("Cannot run: %s", err)
+		t.Fatal(err)
 	}
+
+	for _, result := range results {
+		if result.Status == "FAILED" {
+			t.Fatal("Some test case failed.")
+		}
+	}
+}
+
+func TestIsolte_RunFailed(t *testing.T) {
+	runnerService := initTest()
+	runner := runnerService.NewRunner()
+	defer runner.Cleanup()
+	defer setup.Cleanup()
+
+	err := runner.SetLanguage("cpp_test")
+	if err != nil {
+		t.Fatalf("Cannot set language: %s", err)
+	}
+
+	err = runner.SetFiles([]models.File{
+		{
+			Name: "main.cpp",
+			Content: `#include <iostream>
+				using namespace std;
+				int main() {
+					string name;
+					cin >> name;
+					cout << "Hello " << "eiei" << endl;
+					return 0;
+				}`,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Cannot set files: %s", err)
+	}
+
+	runner.SetCompareID("claude_3.7")
+	runner.SetTestCases(testdatas.Tasks[0].TestCases)
+
+	results, err := runner.Grade()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	failedCount := 0
+	for _, result := range results {
+		if result.Status == "FAILED" {
+			failedCount++
+		}
+	}
+
+	if failedCount == 0 {
+		t.Fatal("All test cases passed.")
+	}
+}
+
+func TestIsolate_MultipleRunners(t *testing.T) {
+	runnerService := initTest()
+	defer setup.Cleanup()
+
+	var wg sync.WaitGroup
+	errChan := make(chan error)
+
+	for range 10 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			runner := runnerService.NewRunner()
+			defer runner.Cleanup()
+			runner.SetLanguage("cpp_test")
+			runner.SetFiles([]models.File{
+				{
+					Name: "main.cpp",
+					Content: `#include <iostream>
+				using namespace std;
+				int main() {
+					string name;
+					cin >> name;
+					cout << "Hello " << name << endl;
+					return 0;
+				}`,
+				},
+			})
+			runner.SetCompareID("claude_3.7")
+			runner.SetTestCases(testdatas.Tasks[0].TestCases)
+			_, err := runner.Grade()
+			if err != nil {
+				errChan <- err
+			}
+		}()
+	}
+
+	wg.Wait()
+	select {
+	case err := <-errChan:
+		if err != nil {
+			t.Fatalf("Error in one of the runners: %s", err)
+		}
+	default:
+	}
+
 }
