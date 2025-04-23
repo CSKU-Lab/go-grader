@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"log"
 	"sync"
 	"testing"
 
@@ -21,7 +22,7 @@ func initTest() services.RunnerService {
 	return runnerService
 }
 
-func TestIsolate_RunPassed(t *testing.T) {
+func TestIsolate_GradePassed(t *testing.T) {
 	runnerService := initTest()
 	runner := runnerService.NewRunner()
 	defer runner.Cleanup()
@@ -64,7 +65,7 @@ func TestIsolate_RunPassed(t *testing.T) {
 	}
 }
 
-func TestIsolte_RunFailed(t *testing.T) {
+func TestIsolate_GradeFailed(t *testing.T) {
 	runnerService := initTest()
 	runner := runnerService.NewRunner()
 	defer runner.Cleanup()
@@ -112,7 +113,7 @@ func TestIsolte_RunFailed(t *testing.T) {
 	}
 }
 
-func TestIsolate_MultipleRunners(t *testing.T) {
+func TestIsolate_GradeMultipleRunners(t *testing.T) {
 	runnerService := initTest()
 	defer setup.Cleanup()
 
@@ -157,4 +158,46 @@ func TestIsolate_MultipleRunners(t *testing.T) {
 	default:
 	}
 
+}
+
+func TestIsolate_RunPassed(t *testing.T) {
+	runnerService := initTest()
+	runner := runnerService.NewRunner()
+	defer runner.Cleanup()
+	defer setup.Cleanup()
+
+	runner.SetLanguage("python_test")
+	runner.SetFiles([]models.File{
+		{
+			Name:    "main.py",
+			Content: `print("Hello World")`,
+		},
+	})
+	result, err := runner.Run()
+	if err != nil {
+		t.Fatalf("Cannot run: %s", err)
+	}
+
+	log.Println(result)
+}
+
+func TestIsolate_RunFailed(t *testing.T) {
+	runnerService := initTest()
+	runner := runnerService.NewRunner()
+	defer runner.Cleanup()
+	defer setup.Cleanup()
+
+	runner.SetLanguage("python_test")
+	runner.SetFiles([]models.File{
+		{
+			Name:    "main.py",
+			Content: `print("Hello World"`,
+		},
+	})
+	result, err := runner.Run()
+	if err != nil {
+		t.Fatalf("Cannot run: %s", err)
+	}
+
+	log.Println(result)
 }
