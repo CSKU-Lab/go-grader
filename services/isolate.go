@@ -105,10 +105,13 @@ func (i *IsolateInstance) BoxPath() string {
 func (i *IsolateInstance) Cleanup() error {
 	i.log("Cleaning up sandbox...")
 	_, err := i.execute("--cleanup")
-	if err == nil {
-		i.boxIds <- i.boxID
+	if err != nil {
+		return err
 	}
-	return err
+
+	i.boxIds <- i.boxID
+
+	return os.Remove(i.metadataPath)
 }
 
 func (i *IsolateInstance) CreateFile(name string, content string, filePerm os.FileMode) error {
