@@ -1,9 +1,8 @@
 package services
 
 import (
-	"errors"
+	"fmt"
 	"log"
-	"os/exec"
 
 	"github.com/CSKU-Lab/go-grader/models"
 )
@@ -14,7 +13,11 @@ type runnerService struct {
 	compareService  *CompareService
 }
 
-func NewRunnerService(isolateService *IsolateService, languageService *LanguageService, compareService *CompareService) *runnerService {
+type RunnerService interface {
+	NewRunner() Runner
+}
+
+func NewRunnerService(isolateService *IsolateService, languageService *LanguageService, compareService *CompareService) RunnerService {
 	return &runnerService{
 		isolateService:  isolateService,
 		languageService: languageService,
@@ -39,7 +42,19 @@ type runner struct {
 	testcases       []models.TestCase
 }
 
-func (r *runnerService) NewRunner() *runner {
+type Runner interface {
+	Cleanup() error
+	SetLanguage(ID string) error
+	SetFiles(files []models.File) error
+	SetInput(input string) error
+	SetLimits(limits *models.Limit)
+	SetTestCases(testCases []models.TestCase)
+	SetCompareID(ID string)
+	Run() (*models.RunResult, error)
+	Grade() ([]models.TestCaseResult, error)
+}
+
+func (r *runnerService) NewRunner() Runner {
 	return &runner{
 		instance:        r.isolateService.NewInstance(),
 		languageService: r.languageService,
@@ -127,68 +142,87 @@ func (r *runner) SetCompareID(ID string) {
 	r.comparePath = compare.Path
 }
 
-func (r *runner) compare(solOutput string) error {
+func (r *runner) compare(solOutput string) (string, error) {
 	err := r.instance.CreateFile("sol_output", solOutput, 0644)
 	if err != nil {
-		return err
-	}
-
-	err = r.instance.CreateDir("feedback_dir", 0755)
-	if err != nil {
-		return err
+		return "", fmt.Errorf("failed to create sol_output file: %w", err)
 	}
 
 	err = r.instance.Run(r.comparePath, nil, false)
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			if exitErr.ExitCode() != 43 {
-				return err
-			}
-		}
+		return "", fmt.Errorf("failed to run compare: %w", err)
 	}
 
-	return nil
-	return r.instance.RemoveDir("feedback_dir")
+	result, err := r.instance.GetCompareResult()
+	if err != nil {
+		return "", fmt.Errorf("failed to get compare result: %w", err)
+	}
+
+	return result, nil
 }
 
-func (r *runner) Run() (*Result, error) {
+func (r *runner) Run() (*models.RunResult, error) {
 	if r.lang.NeedCompile {
 		if err := r.compile(); err != nil {
 			return nil, err
 		}
 	}
 
-	if r.testcases != nil {
-		for _, testCase := range r.testcases {
-			if err := r.SetInput(testCase.Input); err != nil {
-				return nil, err
-			}
+	result, err := r.run()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run: %w", err)
+	}
 
-			result, err := r.run()
-			if err != nil {
-				return nil, err
-			}
+	r.hasInput = false
+	return &models.RunResult{
+		Status: "success",
+		StdOut: result.StdOut,
+		StdErr: result.StdErr,
+	}, nil
+}
 
-			err = r.instance.CreateFile("output", result.StdOut, 0644)
-			if err != nil {
-				return nil, err
-			}
-
-			if err := r.compare(testCase.Output); err != nil {
-				return nil, err
-			}
-			r.hasInput = false
-			break
-		}
-		return nil, nil
-	} else {
-		result, err := r.run()
-		if err != nil {
+func (r *runner) Grade() ([]models.TestCaseResult, error) {
+	if r.lang.NeedCompile {
+		if err := r.compile(); err != nil {
 			return nil, err
 		}
+	}
+
+	var testCaseResults []models.TestCaseResult
+	for _, testCase := range r.testcases {
+		if err := r.SetInput(testCase.Input); err != nil {
+			return nil, fmt.Errorf("failed to set input: %w", err)
+		}
+
+		result, err := r.run()
+		if err != nil {
+			return nil, fmt.Errorf("failed to run: %w", err)
+		}
+
+		err = r.instance.CreateFile("output", result.StdOut, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create output file: %w", err)
+		}
+
+		compareResult, err := r.compare(testCase.Output)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compare: %w", err)
+		}
+
+		status := "FAILED"
+		if compareResult == "" {
+			status = "PASSED"
+		}
+
+		testCaseResult := models.TestCaseResult{
+			ID:      testCase.ID,
+			Status:  status,
+			Message: compareResult,
+		}
+
+		testCaseResults = append(testCaseResults, testCaseResult)
 
 		r.hasInput = false
-		return result, nil
 	}
+	return testCaseResults, nil
 }
