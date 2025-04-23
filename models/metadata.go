@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+/*Two-letter status code:
+* *RE* -- run-time error, i.e., exited with a non-zero exit code
+* *SG* -- program died on a signal
+* *TO* -- timed out
+* *XX* -- internal error of the sandbox
+ */
 type Metadata struct {
 	FailedStatus  string  `json:"failed_status"`
 	FailedMessage string  `json:"failed_message"`
