@@ -27,4 +27,4 @@ COPY . .
 ENV GOARCH=amd64
 ENV GOOS=linux
 
-ENTRYPOINT ["go" ,"test", "-v" ,"./tests/integration/isolate_test.go"]
+ENTRYPOINT ["go" ,"test", "-v" ,"./tests/integration"]
