@@ -8,7 +8,7 @@ import (
 	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
 	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/domain/models"
-	"github.com/CSKU-Lab/go-grader/services"
+	"github.com/CSKU-Lab/go-grader/domain/services"
 	"github.com/CSKU-Lab/go-grader/setup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

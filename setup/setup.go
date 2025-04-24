@@ -12,7 +12,7 @@ import (
 	"github.com/CSKU-Lab/go-grader/constants"
 	"github.com/CSKU-Lab/go-grader/internal/file"
 	"github.com/CSKU-Lab/go-grader/domain/models"
-	"github.com/CSKU-Lab/go-grader/services"
+	"github.com/CSKU-Lab/go-grader/domain/services"
 )
 
 const (

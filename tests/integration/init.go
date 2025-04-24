@@ -3,7 +3,7 @@ package integration
 import (
 	"context"
 
-	"github.com/CSKU-Lab/go-grader/services"
+	"github.com/CSKU-Lab/go-grader/domain/services"
 	"github.com/CSKU-Lab/go-grader/setup"
 	"github.com/CSKU-Lab/go-grader/tests/testdatas"
 )
