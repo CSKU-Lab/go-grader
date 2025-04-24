@@ -1,6 +1,6 @@
 package models
 
-import "github.com/CSKU-Lab/go-grader/constants/execution"
+import "github.com/CSKU-Lab/go-grader/domain/constants/execution"
 
 type TestCaseResult struct {
 	ID       string

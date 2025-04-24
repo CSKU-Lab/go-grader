@@ -6,7 +6,7 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/CSKU-Lab/go-grader/constants/execution"
+	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 )
 

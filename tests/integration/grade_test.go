@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/CSKU-Lab/go-grader/constants/execution"
+	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/internal/setup"
 	"github.com/CSKU-Lab/go-grader/tests/testdatas"

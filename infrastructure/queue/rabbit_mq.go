@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/CSKU-Lab/go-grader/constants"
+	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
