@@ -9,9 +9,9 @@ type TestCase struct {
 }
 
 type TestCaseResult struct {
-	ID             string
-	Status         execution.Status
-	Output         string
-	Error          string
-	CompareMessage string
+	ID      string
+	Status  execution.Status
+	Message string
+	CPUTime float32
+	Memory  int32
 }

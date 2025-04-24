@@ -3,14 +3,14 @@ package integration
 import (
 	"sync"
 	"testing"
-	"time"
 
+	"github.com/CSKU-Lab/go-grader/constants/execution"
 	"github.com/CSKU-Lab/go-grader/models"
 	"github.com/CSKU-Lab/go-grader/setup"
 	"github.com/CSKU-Lab/go-grader/tests/testdatas"
 )
 
-func TestIsolate_GradeCompileError(t *testing.T) {
+func TestGradeCompileError(t *testing.T) {
 	runnerService := initTest()
 	runner := runnerService.NewRunner()
 	defer runner.Cleanup()
@@ -41,20 +41,20 @@ func TestIsolate_GradeCompileError(t *testing.T) {
 	runner.SetCompareID("claude_3.7")
 	runner.SetTestCases(testdatas.Tasks[0].TestCases)
 
-	results, err := runner.Grade()
+	result, err := runner.Grade()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Hour)
-	for _, result := range results {
-		if result.Status == "FAILED" {
-			t.Fatal("Some test case failed.")
-		}
+	expected := execution.COMPILE_FAILED
+	got := result.Status
+
+	if got != expected {
+		t.Fatalf("Expected: %s, Got: %s", expected, got)
 	}
 }
 
-func TestIsolate_GradePassed(t *testing.T) {
+func TestGradePassed(t *testing.T) {
 	runnerService := initTest()
 	runner := runnerService.NewRunner()
 	defer runner.Cleanup()
@@ -85,19 +85,20 @@ func TestIsolate_GradePassed(t *testing.T) {
 	runner.SetCompareID("claude_3.7")
 	runner.SetTestCases(testdatas.Tasks[0].TestCases)
 
-	results, err := runner.Grade()
+	result, err := runner.Grade()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, result := range results {
-		if result.Status == "FAILED" {
-			t.Fatal("Some test case failed.")
-		}
+	expected := execution.RUN_PASSED
+	got := result.Status
+
+	if got != expected {
+		t.Fatalf("Expected: %s, Got: %s", expected, got)
 	}
 }
 
-func TestIsolate_GradeFailed(t *testing.T) {
+func TestGradeFailed(t *testing.T) {
 	runnerService := initTest()
 	runner := runnerService.NewRunner()
 	defer runner.Cleanup()
@@ -128,24 +129,24 @@ func TestIsolate_GradeFailed(t *testing.T) {
 	runner.SetCompareID("claude_3.7")
 	runner.SetTestCases(testdatas.Tasks[0].TestCases)
 
-	results, err := runner.Grade()
+	result, err := runner.Grade()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	failedCount := 0
-	for _, result := range results {
-		if result.Status == "FAILED" {
-			failedCount++
-		}
+	if result.Status == execution.COMPILE_FAILED {
+		t.Fatalf("Compiled error")
 	}
 
-	if failedCount == 0 {
-		t.Fatal("All test cases passed.")
+	expected := execution.RUN_FAILED
+	got := result.Status
+
+	if got != expected {
+		t.Fatalf("Expected: %s, Got: %s", expected, got)
 	}
 }
 
-func TestIsolate_GradeMultipleRunners(t *testing.T) {
+func TestGradeMultipleRunners(t *testing.T) {
 	runnerService := initTest()
 	defer setup.Cleanup()
 
@@ -190,4 +191,47 @@ func TestIsolate_GradeMultipleRunners(t *testing.T) {
 	default:
 	}
 
+}
+
+func TestGradeWithLimits(t *testing.T) {
+	runnerService := initTest()
+	runner := runnerService.NewRunner()
+	defer runner.Cleanup()
+	defer setup.Cleanup()
+
+	err := runner.SetLanguage("python_test")
+	if err != nil {
+		t.Fatalf("Cannot set language: %s", err)
+	}
+
+	err = runner.SetFiles([]models.File{
+		{
+			Name: "main.py",
+			Content: `import time
+time.sleep(50)`,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Cannot set files: %s", err)
+	}
+
+	runner.SetCompareID("claude_3.7")
+	runner.SetTestCases(testdatas.Tasks[0].TestCases)
+	runner.SetLimits(&models.Limit{
+		WallTime: 1,
+	})
+
+	result, err := runner.Grade()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, testcase := range result.TestCaseResults {
+		expected := execution.TIME_LIMIT_EXCEEDED
+		got := testcase.Status
+
+		if got != expected {
+			t.Fatalf("Expected: %s, Got: %s", expected, got)
+		}
+	}
 }

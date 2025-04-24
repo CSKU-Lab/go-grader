@@ -11,7 +11,7 @@ type Metadata struct {
 	FailedMessage string  `json:"failed_message"`
 	Time          float32 `json:"time"`
 	WallTime      float32 `json:"wall_time"`
-	Memory        int     `json:"memory"`
+	Memory        int32   `json:"memory"`
 }
 
 /*
@@ -74,7 +74,7 @@ func ParseMetadata(metadataStr string) (*Metadata, error) {
 			if err != nil {
 				log.Fatal("Cannot parse Memory : ", err)
 			}
-			metadata.Memory = memoryInt
+			metadata.Memory = int32(memoryInt)
 		}
 	}
 	return &metadata, nil

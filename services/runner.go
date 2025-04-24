@@ -174,8 +174,6 @@ func (r *runner) compare(solOutput string) (string, error) {
 		return "", fmt.Errorf("failed to run compare: %w", err)
 	}
 
-	//TODO: Test if compare exit with code 1
-
 	result, err := r.instance.GetCompareResult()
 	if err != nil {
 		return "", fmt.Errorf("failed to get compare result: %w", err)
@@ -200,20 +198,21 @@ func (r *runner) Run() (*models.RunResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to run: %w", err)
 	}
+
+	runResult := &models.RunResult{
+		CPUTime: result.Metadata.Time,
+		Memory:  result.Metadata.Memory,
+		StdOut:  result.StdOut,
+		StdErr:  result.StdErr,
+	}
 	if result.StdErr != "" {
-		return &models.RunResult{
-			Status: execution.RUN_FAILED,
-			StdOut: result.StdOut,
-			StdErr: result.StdErr,
-		}, nil
+		runResult.Status = execution.RUN_FAILED
+		return runResult, nil
 	}
 
 	r.hasInput = false
-	return &models.RunResult{
-		Status: execution.RUN_PASSED,
-		StdOut: result.StdOut,
-		StdErr: result.StdErr,
-	}, nil
+	runResult.Status = execution.RUN_PASSED
+	return runResult, nil
 }
 
 func (r *runner) Grade() (*models.GradeResult, error) {
@@ -231,15 +230,51 @@ func (r *runner) Grade() (*models.GradeResult, error) {
 		}
 	}
 
+	gradedStatus := execution.RUN_PASSED
 	var testCaseResults []models.TestCaseResult
 	for _, testCase := range r.testcases {
 		if err := r.SetInput(testCase.Input); err != nil {
 			return nil, fmt.Errorf("failed to set input: %w", err)
 		}
 
+		testCaseResult := models.TestCaseResult{
+			ID:     testCase.ID,
+			Status: execution.RUN_FAILED,
+		}
+
 		result, err := r.run()
 		if err != nil {
 			return nil, fmt.Errorf("failed to run: %w", err)
+		}
+
+		testCaseResult.CPUTime = result.Metadata.Time
+		testCaseResult.Memory = result.Metadata.Memory
+
+		isFailed := false
+
+		if result.StdErr != "" {
+			testCaseResult.Message = result.StdErr
+			isFailed = true
+		}
+
+		if result.Metadata.FailedStatus != "" {
+			testCaseResult.Message = result.Metadata.FailedMessage
+			switch result.Metadata.FailedStatus {
+			case "TO":
+				testCaseResult.Status = execution.TIME_LIMIT_EXCEEDED
+			case "RE":
+				testCaseResult.Status = execution.RUNTIME_ERROR
+			case "SG":
+				testCaseResult.Status = execution.SIGNAL_ERROR
+			case "XX":
+				testCaseResult.Status = execution.GRADER_ERROR
+			}
+
+			if r.limits.Memory != 0 && result.Metadata.Memory > r.limits.Memory {
+				testCaseResult.Status = execution.MEMORY_LIMIT_EXCEEDED
+			}
+
+			isFailed = true
 		}
 
 		err = r.instance.CreateFile("output", result.StdOut, 0644)
@@ -252,15 +287,16 @@ func (r *runner) Grade() (*models.GradeResult, error) {
 			return nil, fmt.Errorf("failed to compare: %w", err)
 		}
 
-		status := execution.RUN_FAILED
 		if compareResult == "" {
-			status = execution.RUN_PASSED
+			testCaseResult.Status = execution.RUN_PASSED
+		} else {
+			isFailed = true
 		}
 
-		testCaseResult := models.TestCaseResult{
-			ID:             testCase.ID,
-			Status:         status,
-			CompareMessage: compareResult,
+		if isFailed {
+			if gradedStatus != execution.RUN_FAILED {
+				gradedStatus = execution.RUN_FAILED
+			}
 		}
 
 		testCaseResults = append(testCaseResults, testCaseResult)
@@ -268,7 +304,7 @@ func (r *runner) Grade() (*models.GradeResult, error) {
 		r.hasInput = false
 	}
 	return &models.GradeResult{
-		Status:          execution.RUN_PASSED,
+		Status:          gradedStatus,
 		TestCaseResults: testCaseResults,
 	}, nil
 }
