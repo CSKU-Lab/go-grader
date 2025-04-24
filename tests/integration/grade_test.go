@@ -218,7 +218,9 @@ time.sleep(50)`,
 	runner.SetCompareID("claude_3.7")
 	runner.SetTestCases(testdatas.Tasks[0].TestCases)
 	runner.SetLimits(&models.Limit{
-		WallTime: 1,
+		CPUTime:      1,
+		WallTime:     6,
+		CPUExtraTime: 2,
 	})
 
 	result, err := runner.Grade()
