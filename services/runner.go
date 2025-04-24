@@ -200,10 +200,10 @@ func (r *runner) Run() (*models.RunResult, error) {
 	}
 
 	runResult := &models.RunResult{
-		CPUTime: result.Metadata.Time,
-		Memory:  result.Metadata.Memory,
-		StdOut:  result.StdOut,
-		StdErr:  result.StdErr,
+		WallTime: result.Metadata.WallTime,
+		Memory:   result.Metadata.Memory,
+		StdOut:   result.StdOut,
+		StdErr:   result.StdErr,
 	}
 	if result.StdErr != "" {
 		runResult.Status = execution.RUN_FAILED
@@ -247,7 +247,7 @@ func (r *runner) Grade() (*models.GradeResult, error) {
 			return nil, fmt.Errorf("failed to run: %w", err)
 		}
 
-		testCaseResult.CPUTime = result.Metadata.Time
+		testCaseResult.WallTime = result.Metadata.WallTime
 		testCaseResult.Memory = result.Metadata.Memory
 
 		isFailed := false
