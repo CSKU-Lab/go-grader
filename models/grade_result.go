@@ -8,6 +8,8 @@ type TestCaseResult struct {
 	Message  string
 	WallTime float32
 	Memory   int32
+	StdOut   string
+	StdErr   string
 }
 
 type GradeResult struct {

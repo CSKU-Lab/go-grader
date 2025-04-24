@@ -247,6 +247,8 @@ func (r *runner) Grade() (*models.GradeResult, error) {
 			return nil, fmt.Errorf("failed to run: %w", err)
 		}
 
+		testCaseResult.StdOut = result.StdOut
+		testCaseResult.StdErr = result.StdErr
 		testCaseResult.WallTime = result.Metadata.WallTime
 		testCaseResult.Memory = result.Metadata.Memory
 
