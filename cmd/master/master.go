@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
+	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 )
 
