@@ -9,7 +9,7 @@ import (
 	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
-	"github.com/CSKU-Lab/go-grader/setup"
+	"github.com/CSKU-Lab/go-grader/internal/setup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"

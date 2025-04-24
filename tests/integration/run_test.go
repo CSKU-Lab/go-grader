@@ -6,7 +6,7 @@ import (
 
 	"github.com/CSKU-Lab/go-grader/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
-	"github.com/CSKU-Lab/go-grader/setup"
+	"github.com/CSKU-Lab/go-grader/internal/setup"
 )
 
 func TestRunPassed(t *testing.T) {
