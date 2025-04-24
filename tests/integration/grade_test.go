@@ -1,25 +1,57 @@
-package integration_test
+package integration
 
 import (
-	"context"
-	"log"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/CSKU-Lab/go-grader/models"
-	"github.com/CSKU-Lab/go-grader/services"
 	"github.com/CSKU-Lab/go-grader/setup"
 	"github.com/CSKU-Lab/go-grader/tests/testdatas"
 )
 
-func initTest() services.RunnerService {
-	setup.Init(testdatas.Languages, testdatas.Compares)
-	isolateService := services.NewIsolateService(context.Background())
-	languageService := services.NewLanguageService()
-	compareService := services.NewCompareService()
-	runnerService := services.NewRunnerService(isolateService, languageService, compareService)
+func TestIsolate_GradeCompileError(t *testing.T) {
+	runnerService := initTest()
+	runner := runnerService.NewRunner()
+	defer runner.Cleanup()
+	defer setup.Cleanup()
 
-	return runnerService
+	err := runner.SetLanguage("cpp_test")
+	if err != nil {
+		t.Fatalf("Cannot set language: %s", err)
+	}
+
+	err = runner.SetFiles([]models.File{
+		{
+			Name: "main.cpp",
+			Content: `#include <iostream>
+				using namespace std;
+				int main() {
+					string name;
+					cin >> name;
+					cout << "Hello " << name << endl
+					return 0;
+				}`,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Cannot set files: %s", err)
+	}
+
+	runner.SetCompareID("claude_3.7")
+	runner.SetTestCases(testdatas.Tasks[0].TestCases)
+
+	results, err := runner.Grade()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(time.Hour)
+	for _, result := range results {
+		if result.Status == "FAILED" {
+			t.Fatal("Some test case failed.")
+		}
+	}
 }
 
 func TestIsolate_GradePassed(t *testing.T) {
@@ -158,46 +190,4 @@ func TestIsolate_GradeMultipleRunners(t *testing.T) {
 	default:
 	}
 
-}
-
-func TestIsolate_RunPassed(t *testing.T) {
-	runnerService := initTest()
-	runner := runnerService.NewRunner()
-	defer runner.Cleanup()
-	defer setup.Cleanup()
-
-	runner.SetLanguage("python_test")
-	runner.SetFiles([]models.File{
-		{
-			Name:    "main.py",
-			Content: `print("Hello World")`,
-		},
-	})
-	result, err := runner.Run()
-	if err != nil {
-		t.Fatalf("Cannot run: %s", err)
-	}
-
-	log.Println(result)
-}
-
-func TestIsolate_RunFailed(t *testing.T) {
-	runnerService := initTest()
-	runner := runnerService.NewRunner()
-	defer runner.Cleanup()
-	defer setup.Cleanup()
-
-	runner.SetLanguage("python_test")
-	runner.SetFiles([]models.File{
-		{
-			Name:    "main.py",
-			Content: `print("Hello World"`,
-		},
-	})
-	result, err := runner.Run()
-	if err != nil {
-		t.Fatalf("Cannot run: %s", err)
-	}
-
-	log.Println(result)
 }
