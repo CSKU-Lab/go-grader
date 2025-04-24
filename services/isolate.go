@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -61,34 +60,15 @@ func (i *IsolateInstance) logFatalf(format string, args ...any) {
 	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
-func (s *IsolateInstance) execute(args ...string) (string, error) {
+func (s *IsolateInstance) execute(args ...string) error {
 	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
 	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
-	var stdOut bytes.Buffer
-	var stdErr bytes.Buffer
-
-	cmd.Stdout = &stdOut
-	cmd.Stderr = &stdErr
-
-	err := cmd.Run()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			// recheck if the command you ran with isolate command is exist
-			if exitErr.ExitCode() == 127 {
-				return "", errors.New("the command you pass to isolate is not exist")
-			}
-			return stdOut.String(), nil
-		}
-		return "", errors.New(stdErr.String())
-	}
-
-	return stdOut.String(), nil
+	return cmd.Run()
 }
 
 func (i *IsolateInstance) init() {
 	i.log("Initializing sandbox...")
-	_, err := i.execute("--init")
+	err := i.execute("--init")
 	if err != nil {
 		i.logFatalf("Error on init: %s", err)
 	}
@@ -104,7 +84,7 @@ func (i *IsolateInstance) BoxPath() string {
 
 func (i *IsolateInstance) Cleanup() error {
 	i.log("Cleaning up sandbox...")
-	_, err := i.execute("--cleanup")
+	err := i.execute("--cleanup")
 	if err != nil {
 		return err
 	}
@@ -138,12 +118,13 @@ func (i *IsolateInstance) Compile() error {
 	args := []string{
 		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"--processes=0",
+		"--stderr=stderr",
 		"--run",
 		"--",
 		"build_script.sh",
 	}
 
-	_, err := i.execute(args...)
+	err := i.execute(args...)
 	if err != nil {
 		i.log("Compile error : %s", err.Error())
 	}
@@ -160,12 +141,13 @@ func (i *IsolateInstance) CompileUsing(scriptDir string) error {
 		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		fmt.Sprintf("--dir=%s", scriptDir),
 		"--processes=0",
+		"--stderr=stderr",
 		"--run",
 		"--",
 		fmt.Sprintf("%s/build_script.sh", scriptDir),
 	}
 
-	_, err := i.execute(args...)
+	err := i.execute(args...)
 	if err != nil {
 		i.log("Compile error : %s", err.Error())
 	}
@@ -196,16 +178,24 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 
 	args = append(_limits, args...)
 
-	_, err := i.execute(args...)
+	err := i.execute(args...)
 	if err != nil {
-		stderr, err := i.GetError()
-		if err != nil {
-			return errors.New("Cannot get stderr")
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// recheck if the command you ran with isolate command is exist
+			if exitErr.ExitCode() == 127 {
+				return errors.New("the command you pass to isolate is not exist")
+			}
+
+			stderr, err := i.GetError()
+			if err != nil {
+				return errors.New("Cannot get stderr")
+			}
+
+			return errors.New(stderr)
 		}
-
-		return errors.New(stderr)
+		return errors.New("Unknown error")
 	}
-
 	return nil
 }
 
@@ -214,7 +204,7 @@ func (i *IsolateInstance) GetOutput() (string, error) {
 
 	data, err := os.ReadFile(i.boxPath + "/stdout")
 	if err != nil {
-		return "", fmt.Errorf("Cannot read metadata file : %s", err)
+		return "", fmt.Errorf("Cannot read stdout file : %s", err)
 	}
 
 	return string(data), nil
@@ -224,7 +214,7 @@ func (i *IsolateInstance) GetError() (string, error) {
 	i.log("Getting stderror...")
 	data, err := os.ReadFile(i.boxPath + "/stderr")
 	if err != nil {
-		return "", fmt.Errorf("Cannot read metadata file : %s", err)
+		return "", fmt.Errorf("Cannot read stderr file : %s", err)
 	}
 
 	return string(data), nil
