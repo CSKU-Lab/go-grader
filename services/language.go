@@ -7,7 +7,7 @@ import (
 	"slices"
 
 	"github.com/CSKU-Lab/go-grader/constants"
-	"github.com/CSKU-Lab/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/domain/models"
 )
 
 type LanguageService struct {

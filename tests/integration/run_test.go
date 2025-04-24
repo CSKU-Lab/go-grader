@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/CSKU-Lab/go-grader/constants/execution"
-	"github.com/CSKU-Lab/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/setup"
 )
 

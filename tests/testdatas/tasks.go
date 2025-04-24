@@ -1,6 +1,6 @@
 package testdatas
 
-import "github.com/CSKU-Lab/go-grader/models"
+import "github.com/CSKU-Lab/go-grader/domain/models"
 
 var Tasks = []models.Task{
 	{

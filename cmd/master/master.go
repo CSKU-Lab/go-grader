@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/CSKU-Lab/go-grader/infrastructure/queue"
-	"github.com/CSKU-Lab/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/domain/models"
 )
 
 func main() {

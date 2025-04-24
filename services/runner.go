@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/CSKU-Lab/go-grader/constants/execution"
-	"github.com/CSKU-Lab/go-grader/models"
+	"github.com/CSKU-Lab/go-grader/domain/models"
 )
 
 type runnerService struct {
