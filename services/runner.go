@@ -1,9 +1,12 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"os/exec"
 
+	"github.com/CSKU-Lab/go-grader/constants/execution"
 	"github.com/CSKU-Lab/go-grader/models"
 )
 
@@ -51,7 +54,7 @@ type Runner interface {
 	SetTestCases(testCases []models.TestCase)
 	SetCompareID(ID string)
 	Run() (*models.RunResult, error)
-	Grade() ([]models.TestCaseResult, error)
+	Grade() (*models.GradeResult, error)
 }
 
 func (r *runnerService) NewRunner() Runner {
@@ -90,8 +93,26 @@ func (r *runner) SetInput(input string) error {
 	return r.instance.CreateFile("input", input, 0644)
 }
 
-func (r *runner) compile() error {
-	return r.instance.CompileUsing(r.lang.Path)
+func (r *runner) compile() (*models.RunResult, error) {
+	err := r.instance.CompileUsing(r.lang.Path)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			stderr, err := r.instance.GetError()
+			if err != nil {
+				return nil, err
+			}
+
+			return &models.RunResult{
+				Status: execution.COMPILE_FAILED,
+				StdOut: "",
+				StdErr: stderr,
+			}, nil
+		}
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 func (r *runner) run() (*Result, error) {
@@ -153,6 +174,8 @@ func (r *runner) compare(solOutput string) (string, error) {
 		return "", fmt.Errorf("failed to run compare: %w", err)
 	}
 
+	//TODO: Test if compare exit with code 1
+
 	result, err := r.instance.GetCompareResult()
 	if err != nil {
 		return "", fmt.Errorf("failed to get compare result: %w", err)
@@ -163,8 +186,13 @@ func (r *runner) compare(solOutput string) (string, error) {
 
 func (r *runner) Run() (*models.RunResult, error) {
 	if r.lang.NeedCompile {
-		if err := r.compile(); err != nil {
+		result, err := r.compile()
+		if err != nil {
 			return nil, err
+		}
+
+		if result != nil {
+			return result, nil
 		}
 	}
 
@@ -172,19 +200,34 @@ func (r *runner) Run() (*models.RunResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to run: %w", err)
 	}
+	if result.StdErr != "" {
+		return &models.RunResult{
+			Status: execution.RUN_FAILED,
+			StdOut: result.StdOut,
+			StdErr: result.StdErr,
+		}, nil
+	}
 
 	r.hasInput = false
 	return &models.RunResult{
-		Status: "success",
+		Status: execution.RUN_PASSED,
 		StdOut: result.StdOut,
 		StdErr: result.StdErr,
 	}, nil
 }
 
-func (r *runner) Grade() ([]models.TestCaseResult, error) {
+func (r *runner) Grade() (*models.GradeResult, error) {
 	if r.lang.NeedCompile {
-		if err := r.compile(); err != nil {
+		result, err := r.compile()
+		if err != nil {
 			return nil, err
+		}
+
+		if result != nil {
+			return &models.GradeResult{
+				Status: result.Status,
+				Error:  result.StdErr,
+			}, nil
 		}
 	}
 
@@ -209,20 +252,23 @@ func (r *runner) Grade() ([]models.TestCaseResult, error) {
 			return nil, fmt.Errorf("failed to compare: %w", err)
 		}
 
-		status := "FAILED"
+		status := execution.RUN_FAILED
 		if compareResult == "" {
-			status = "PASSED"
+			status = execution.RUN_PASSED
 		}
 
 		testCaseResult := models.TestCaseResult{
-			ID:      testCase.ID,
-			Status:  status,
-			Message: compareResult,
+			ID:             testCase.ID,
+			Status:         status,
+			CompareMessage: compareResult,
 		}
 
 		testCaseResults = append(testCaseResults, testCaseResult)
 
 		r.hasInput = false
 	}
-	return testCaseResults, nil
+	return &models.GradeResult{
+		Status:          execution.RUN_PASSED,
+		TestCaseResults: testCaseResults,
+	}, nil
 }

@@ -6,12 +6,6 @@ import (
 	"strings"
 )
 
-/*Two-letter status code:
-* *RE* -- run-time error, i.e., exited with a non-zero exit code
-* *SG* -- program died on a signal
-* *TO* -- timed out
-* *XX* -- internal error of the sandbox
- */
 type Metadata struct {
 	FailedStatus  string  `json:"failed_status"`
 	FailedMessage string  `json:"failed_message"`
@@ -20,6 +14,32 @@ type Metadata struct {
 	Memory        int     `json:"memory"`
 }
 
+/*
+*max-rss*::
+
+	Maximum resident set size of the process (in kilobytes).
+
+*message*::
+
+	Status message, not intended for machine processing.
+	E.g., "Time limit exceeded."
+
+*status*::
+
+	Two-letter status code:
+	* *RE* -- run-time error, i.e., exited with a non-zero exit code
+	* *SG* -- program died on a signal
+	* *TO* -- timed out
+	* *XX* -- internal error of the sandbox
+
+*time*::
+
+	Run time of the program in fractional seconds.
+
+*time-wall*::
+
+	Wall clock time of the program in fractional seconds.
+*/
 func ParseMetadata(metadataStr string) (*Metadata, error) {
 	var metadata Metadata
 	for line := range strings.SplitSeq(metadataStr, "\n") {

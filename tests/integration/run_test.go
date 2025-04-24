@@ -4,6 +4,7 @@ import (
 	"log"
 	"testing"
 
+	"github.com/CSKU-Lab/go-grader/constants/execution"
 	"github.com/CSKU-Lab/go-grader/models"
 	"github.com/CSKU-Lab/go-grader/setup"
 )
@@ -48,13 +49,39 @@ func TestRunWithInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot run: %s", err)
 	}
-	log.Println(result.StdOut)
 
 	expected := "Hello World\n"
 	got := result.StdOut
 
 	if got != expected {
 		t.Fatalf("Expected: %s, Got: %s", expected, got)
+	}
+}
+
+func TestRunCompileFailed(t *testing.T) {
+	runnerService := initTest()
+	runner := runnerService.NewRunner()
+	defer runner.Cleanup()
+	defer setup.Cleanup()
+
+	runner.SetLanguage("cpp_test")
+	runner.SetFiles([]models.File{
+		{
+			Name:    "main.cpp",
+			Content: "#include <iostream",
+		},
+	})
+
+	result, err := runner.Run()
+	if err != nil {
+		t.Fatalf("Cannot run : %s", err)
+	}
+
+	expected := execution.COMPILE_FAILED
+	got := result.Status
+
+	if got != expected {
+		t.Fatalf("Expected %s, Got %s", expected, got)
 	}
 }
 
@@ -76,5 +103,10 @@ func TestRunFailed(t *testing.T) {
 		t.Fatalf("Cannot run: %s", err)
 	}
 
-	log.Println(result)
+	expected := execution.RUN_FAILED
+	got := result.Status
+
+	if got != expected {
+		t.Fatalf("Expected %s, Got %s", expected, got)
+	}
 }

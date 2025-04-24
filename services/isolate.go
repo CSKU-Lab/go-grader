@@ -186,15 +186,9 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 			if exitErr.ExitCode() == 127 {
 				return errors.New("the command you pass to isolate is not exist")
 			}
-
-			stderr, err := i.GetError()
-			if err != nil {
-				return errors.New("Cannot get stderr")
-			}
-
-			return errors.New(stderr)
+			return nil
 		}
-		return errors.New("Unknown error")
+		return err
 	}
 	return nil
 }
