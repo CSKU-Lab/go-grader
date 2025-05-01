@@ -11,11 +11,11 @@ import (
 
 func TestRunPassed(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	runner.SetLanguage("python_test")
+	runner.SetRunner("python_test")
 	runner.SetFiles([]models.File{
 		{
 			Name:    "main.py",
@@ -32,11 +32,11 @@ func TestRunPassed(t *testing.T) {
 
 func TestRunWithInput(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	runner.SetLanguage("python_test")
+	runner.SetRunner("python_test")
 	runner.SetFiles([]models.File{
 		{
 			Name:    "main.py",
@@ -60,11 +60,11 @@ func TestRunWithInput(t *testing.T) {
 
 func TestRunCompileFailed(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	runner.SetLanguage("cpp_test")
+	runner.SetRunner("cpp_test")
 	runner.SetFiles([]models.File{
 		{
 			Name:    "main.cpp",
@@ -87,11 +87,11 @@ func TestRunCompileFailed(t *testing.T) {
 
 func TestRunFailed(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	runner.SetLanguage("python_test")
+	runner.SetRunner("python_test")
 	runner.SetFiles([]models.File{
 		{
 			Name:    "main.py",

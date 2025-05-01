@@ -12,11 +12,11 @@ import (
 
 func TestGradeCompileError(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	err := runner.SetLanguage("cpp_test")
+	err := runner.SetRunner("cpp_test")
 	if err != nil {
 		t.Fatalf("Cannot set language: %s", err)
 	}
@@ -56,11 +56,11 @@ func TestGradeCompileError(t *testing.T) {
 
 func TestGradePassed(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	err := runner.SetLanguage("cpp_test")
+	err := runner.SetRunner("cpp_test")
 	if err != nil {
 		t.Fatalf("Cannot set language: %s", err)
 	}
@@ -100,11 +100,11 @@ func TestGradePassed(t *testing.T) {
 
 func TestGradeFailed(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	err := runner.SetLanguage("cpp_test")
+	err := runner.SetRunner("cpp_test")
 	if err != nil {
 		t.Fatalf("Cannot set language: %s", err)
 	}
@@ -157,9 +157,9 @@ func TestGradeMultipleRunners(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runner := runnerService.NewRunner()
+			runner := runnerService.NewExecutor()
 			defer runner.Cleanup()
-			runner.SetLanguage("cpp_test")
+			runner.SetRunner("cpp_test")
 			runner.SetFiles([]models.File{
 				{
 					Name: "main.cpp",
@@ -195,11 +195,11 @@ func TestGradeMultipleRunners(t *testing.T) {
 
 func TestGradeWithLimits(t *testing.T) {
 	runnerService := initTest()
-	runner := runnerService.NewRunner()
+	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
 	defer setup.Cleanup()
 
-	err := runner.SetLanguage("python_test")
+	err := runner.SetRunner("python_test")
 	if err != nil {
 		t.Fatalf("Cannot set language: %s", err)
 	}

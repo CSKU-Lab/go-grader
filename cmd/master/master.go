@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"time"
 
-	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/domain/models"
+	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 )
 
 func main() {
@@ -22,15 +21,11 @@ func main() {
 	execution := models.Execution{
 		Files: []models.File{
 			{
-				Name: "main.c",
-				Content: `#include<stdio.h>
-				int main() {
-					printf("Hello World");
-					return 0;
-				}`,
+				Name:    "main.py",
+				Content: `print("Hello World")`,
 			},
 		},
-		LanguageID: "C_99",
+		RunnerID: "python_3_11_2",
 	}
 
 	message, err := json.Marshal(&execution)
@@ -38,15 +33,12 @@ func main() {
 		log.Fatalln("Cannot parse execution struct to json")
 	}
 
-	for {
-		for range 10 {
-			err = rb.Publish(ctx, "execution", message)
-			if err != nil {
-				log.Fatalln("Cannot publish message to the execution queue")
-			}
-
-			log.Println("Publish message to the queue successfully!")
+	for range 10 {
+		err = rb.Publish(ctx, "running", message)
+		if err != nil {
+			log.Fatalln("Cannot publish message to the execution queue")
 		}
-		time.Sleep(time.Second * 2)
+
+		log.Println("Publish message to the queue successfully!")
 	}
 }

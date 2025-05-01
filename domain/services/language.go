@@ -10,24 +10,24 @@ import (
 	"github.com/CSKU-Lab/go-grader/domain/models"
 )
 
-type LanguageService struct {
-	languages []models.LocalLanguage
+type RunnerService struct {
+	runners []models.LocalRunner
 }
 
-func NewLanguageService() *LanguageService {
-	languages, err := getLanguages()
+func NewRunnerService() *RunnerService {
+	runners, err := getRunners()
 	if err != nil {
-		log.Fatalf("Cannot get languages: %s", err)
+		log.Fatalf("Cannot get runners: %s", err)
 	}
 
-	return &LanguageService{
-		languages: languages,
+	return &RunnerService{
+		runners: runners,
 	}
 
 }
 
-func isNeedCompile(langPath string) (bool, error) {
-	entries, err := os.ReadDir(langPath)
+func isNeedCompile(runnerPath string) (bool, error) {
+	entries, err := os.ReadDir(runnerPath)
 	if err != nil {
 		return false, err
 	}
@@ -38,25 +38,23 @@ func isNeedCompile(langPath string) (bool, error) {
 
 }
 
-func getLanguages() ([]models.LocalLanguage, error) {
-	LANGDIR := constants.CONFIG_DIR + "/languages"
-
-	entries, err := os.ReadDir(LANGDIR)
+func getRunners() ([]models.LocalRunner, error) {
+	entries, err := os.ReadDir(constants.RUNNER_DIR)
 	if err != nil {
 		return nil, err
 	}
 
-	var languages []models.LocalLanguage
+	var languages []models.LocalRunner
 
 	for _, file := range entries {
-		needCompile, err := isNeedCompile(LANGDIR + "/" + file.Name())
+		needCompile, err := isNeedCompile(constants.RUNNER_DIR + "/" + file.Name())
 		if err != nil {
 			return nil, err
 		}
 
-		languages = append(languages, models.LocalLanguage{
+		languages = append(languages, models.LocalRunner{
 			ID:          file.Name(),
-			Path:        LANGDIR + "/" + file.Name(),
+			Path:        constants.RUNNER_DIR + "/" + file.Name(),
 			NeedCompile: needCompile,
 		})
 	}
@@ -64,12 +62,12 @@ func getLanguages() ([]models.LocalLanguage, error) {
 	return languages, nil
 }
 
-func (l *LanguageService) GetByID(ID string) (*models.LocalLanguage, error) {
-	for _, lang := range l.languages {
-		if lang.ID == ID {
-			return &lang, nil
+func (l *RunnerService) GetByID(ID string) (*models.LocalRunner, error) {
+	for _, runner := range l.runners {
+		if runner.ID == ID {
+			return &runner, nil
 		}
 	}
 
-	return nil, errors.New("language not found")
+	return nil, errors.New("runner not found")
 }

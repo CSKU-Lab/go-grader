@@ -20,27 +20,27 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ConfigService_GetLanguages_FullMethodName   = "/config.v1.ConfigService/GetLanguages"
-	ConfigService_GetLanguage_FullMethodName    = "/config.v1.ConfigService/GetLanguage"
-	ConfigService_AddLanguage_FullMethodName    = "/config.v1.ConfigService/AddLanguage"
-	ConfigService_UpdateLanguage_FullMethodName = "/config.v1.ConfigService/UpdateLanguage"
-	ConfigService_DeleteLanguage_FullMethodName = "/config.v1.ConfigService/DeleteLanguage"
-	ConfigService_GetCompares_FullMethodName    = "/config.v1.ConfigService/GetCompares"
-	ConfigService_GetCompare_FullMethodName     = "/config.v1.ConfigService/GetCompare"
-	ConfigService_AddCompare_FullMethodName     = "/config.v1.ConfigService/AddCompare"
-	ConfigService_UpdateCompare_FullMethodName  = "/config.v1.ConfigService/UpdateCompare"
-	ConfigService_DeleteCompare_FullMethodName  = "/config.v1.ConfigService/DeleteCompare"
+	ConfigService_GetRunners_FullMethodName    = "/config.v1.ConfigService/GetRunners"
+	ConfigService_GetRunner_FullMethodName     = "/config.v1.ConfigService/GetRunner"
+	ConfigService_AddRunner_FullMethodName     = "/config.v1.ConfigService/AddRunner"
+	ConfigService_UpdateRunner_FullMethodName  = "/config.v1.ConfigService/UpdateRunner"
+	ConfigService_DeleteRunner_FullMethodName  = "/config.v1.ConfigService/DeleteRunner"
+	ConfigService_GetCompares_FullMethodName   = "/config.v1.ConfigService/GetCompares"
+	ConfigService_GetCompare_FullMethodName    = "/config.v1.ConfigService/GetCompare"
+	ConfigService_AddCompare_FullMethodName    = "/config.v1.ConfigService/AddCompare"
+	ConfigService_UpdateCompare_FullMethodName = "/config.v1.ConfigService/UpdateCompare"
+	ConfigService_DeleteCompare_FullMethodName = "/config.v1.ConfigService/DeleteCompare"
 )
 
 // ConfigServiceClient is the client API for ConfigService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConfigServiceClient interface {
-	GetLanguages(ctx context.Context, in *GetLanguagesRequest, opts ...grpc.CallOption) (*GetLanguagesResponse, error)
-	GetLanguage(ctx context.Context, in *GetLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error)
-	AddLanguage(ctx context.Context, in *AddLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error)
-	UpdateLanguage(ctx context.Context, in *UpdateLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error)
-	DeleteLanguage(ctx context.Context, in *DeleteLanguageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetRunners(ctx context.Context, in *GetRunnersRequest, opts ...grpc.CallOption) (*GetRunnersResponse, error)
+	GetRunner(ctx context.Context, in *GetRunnerRequest, opts ...grpc.CallOption) (*RunnerResponse, error)
+	AddRunner(ctx context.Context, in *AddRunnerRequest, opts ...grpc.CallOption) (*RunnerResponse, error)
+	UpdateRunner(ctx context.Context, in *UpdateRunnerRequest, opts ...grpc.CallOption) (*RunnerResponse, error)
+	DeleteRunner(ctx context.Context, in *DeleteRunnerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetCompares(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetComparesResponse, error)
 	GetCompare(ctx context.Context, in *GetCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error)
 	AddCompare(ctx context.Context, in *AddCompareRequest, opts ...grpc.CallOption) (*CompareResponse, error)
@@ -56,50 +56,50 @@ func NewConfigServiceClient(cc grpc.ClientConnInterface) ConfigServiceClient {
 	return &configServiceClient{cc}
 }
 
-func (c *configServiceClient) GetLanguages(ctx context.Context, in *GetLanguagesRequest, opts ...grpc.CallOption) (*GetLanguagesResponse, error) {
+func (c *configServiceClient) GetRunners(ctx context.Context, in *GetRunnersRequest, opts ...grpc.CallOption) (*GetRunnersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetLanguagesResponse)
-	err := c.cc.Invoke(ctx, ConfigService_GetLanguages_FullMethodName, in, out, cOpts...)
+	out := new(GetRunnersResponse)
+	err := c.cc.Invoke(ctx, ConfigService_GetRunners_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *configServiceClient) GetLanguage(ctx context.Context, in *GetLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error) {
+func (c *configServiceClient) GetRunner(ctx context.Context, in *GetRunnerRequest, opts ...grpc.CallOption) (*RunnerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LanguageResponse)
-	err := c.cc.Invoke(ctx, ConfigService_GetLanguage_FullMethodName, in, out, cOpts...)
+	out := new(RunnerResponse)
+	err := c.cc.Invoke(ctx, ConfigService_GetRunner_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *configServiceClient) AddLanguage(ctx context.Context, in *AddLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error) {
+func (c *configServiceClient) AddRunner(ctx context.Context, in *AddRunnerRequest, opts ...grpc.CallOption) (*RunnerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LanguageResponse)
-	err := c.cc.Invoke(ctx, ConfigService_AddLanguage_FullMethodName, in, out, cOpts...)
+	out := new(RunnerResponse)
+	err := c.cc.Invoke(ctx, ConfigService_AddRunner_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *configServiceClient) UpdateLanguage(ctx context.Context, in *UpdateLanguageRequest, opts ...grpc.CallOption) (*LanguageResponse, error) {
+func (c *configServiceClient) UpdateRunner(ctx context.Context, in *UpdateRunnerRequest, opts ...grpc.CallOption) (*RunnerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LanguageResponse)
-	err := c.cc.Invoke(ctx, ConfigService_UpdateLanguage_FullMethodName, in, out, cOpts...)
+	out := new(RunnerResponse)
+	err := c.cc.Invoke(ctx, ConfigService_UpdateRunner_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *configServiceClient) DeleteLanguage(ctx context.Context, in *DeleteLanguageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *configServiceClient) DeleteRunner(ctx context.Context, in *DeleteRunnerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, ConfigService_DeleteLanguage_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ConfigService_DeleteRunner_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -160,11 +160,11 @@ func (c *configServiceClient) DeleteCompare(ctx context.Context, in *DeleteCompa
 // All implementations must embed UnimplementedConfigServiceServer
 // for forward compatibility.
 type ConfigServiceServer interface {
-	GetLanguages(context.Context, *GetLanguagesRequest) (*GetLanguagesResponse, error)
-	GetLanguage(context.Context, *GetLanguageRequest) (*LanguageResponse, error)
-	AddLanguage(context.Context, *AddLanguageRequest) (*LanguageResponse, error)
-	UpdateLanguage(context.Context, *UpdateLanguageRequest) (*LanguageResponse, error)
-	DeleteLanguage(context.Context, *DeleteLanguageRequest) (*emptypb.Empty, error)
+	GetRunners(context.Context, *GetRunnersRequest) (*GetRunnersResponse, error)
+	GetRunner(context.Context, *GetRunnerRequest) (*RunnerResponse, error)
+	AddRunner(context.Context, *AddRunnerRequest) (*RunnerResponse, error)
+	UpdateRunner(context.Context, *UpdateRunnerRequest) (*RunnerResponse, error)
+	DeleteRunner(context.Context, *DeleteRunnerRequest) (*emptypb.Empty, error)
 	GetCompares(context.Context, *emptypb.Empty) (*GetComparesResponse, error)
 	GetCompare(context.Context, *GetCompareRequest) (*CompareResponse, error)
 	AddCompare(context.Context, *AddCompareRequest) (*CompareResponse, error)
@@ -180,20 +180,20 @@ type ConfigServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedConfigServiceServer struct{}
 
-func (UnimplementedConfigServiceServer) GetLanguages(context.Context, *GetLanguagesRequest) (*GetLanguagesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetLanguages not implemented")
+func (UnimplementedConfigServiceServer) GetRunners(context.Context, *GetRunnersRequest) (*GetRunnersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRunners not implemented")
 }
-func (UnimplementedConfigServiceServer) GetLanguage(context.Context, *GetLanguageRequest) (*LanguageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetLanguage not implemented")
+func (UnimplementedConfigServiceServer) GetRunner(context.Context, *GetRunnerRequest) (*RunnerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRunner not implemented")
 }
-func (UnimplementedConfigServiceServer) AddLanguage(context.Context, *AddLanguageRequest) (*LanguageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddLanguage not implemented")
+func (UnimplementedConfigServiceServer) AddRunner(context.Context, *AddRunnerRequest) (*RunnerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddRunner not implemented")
 }
-func (UnimplementedConfigServiceServer) UpdateLanguage(context.Context, *UpdateLanguageRequest) (*LanguageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateLanguage not implemented")
+func (UnimplementedConfigServiceServer) UpdateRunner(context.Context, *UpdateRunnerRequest) (*RunnerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateRunner not implemented")
 }
-func (UnimplementedConfigServiceServer) DeleteLanguage(context.Context, *DeleteLanguageRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteLanguage not implemented")
+func (UnimplementedConfigServiceServer) DeleteRunner(context.Context, *DeleteRunnerRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteRunner not implemented")
 }
 func (UnimplementedConfigServiceServer) GetCompares(context.Context, *emptypb.Empty) (*GetComparesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCompares not implemented")
@@ -231,92 +231,92 @@ func RegisterConfigServiceServer(s grpc.ServiceRegistrar, srv ConfigServiceServe
 	s.RegisterService(&ConfigService_ServiceDesc, srv)
 }
 
-func _ConfigService_GetLanguages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetLanguagesRequest)
+func _ConfigService_GetRunners_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRunnersRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConfigServiceServer).GetLanguages(ctx, in)
+		return srv.(ConfigServiceServer).GetRunners(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ConfigService_GetLanguages_FullMethodName,
+		FullMethod: ConfigService_GetRunners_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConfigServiceServer).GetLanguages(ctx, req.(*GetLanguagesRequest))
+		return srv.(ConfigServiceServer).GetRunners(ctx, req.(*GetRunnersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ConfigService_GetLanguage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetLanguageRequest)
+func _ConfigService_GetRunner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRunnerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConfigServiceServer).GetLanguage(ctx, in)
+		return srv.(ConfigServiceServer).GetRunner(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ConfigService_GetLanguage_FullMethodName,
+		FullMethod: ConfigService_GetRunner_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConfigServiceServer).GetLanguage(ctx, req.(*GetLanguageRequest))
+		return srv.(ConfigServiceServer).GetRunner(ctx, req.(*GetRunnerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ConfigService_AddLanguage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AddLanguageRequest)
+func _ConfigService_AddRunner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddRunnerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConfigServiceServer).AddLanguage(ctx, in)
+		return srv.(ConfigServiceServer).AddRunner(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ConfigService_AddLanguage_FullMethodName,
+		FullMethod: ConfigService_AddRunner_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConfigServiceServer).AddLanguage(ctx, req.(*AddLanguageRequest))
+		return srv.(ConfigServiceServer).AddRunner(ctx, req.(*AddRunnerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ConfigService_UpdateLanguage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateLanguageRequest)
+func _ConfigService_UpdateRunner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRunnerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConfigServiceServer).UpdateLanguage(ctx, in)
+		return srv.(ConfigServiceServer).UpdateRunner(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ConfigService_UpdateLanguage_FullMethodName,
+		FullMethod: ConfigService_UpdateRunner_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConfigServiceServer).UpdateLanguage(ctx, req.(*UpdateLanguageRequest))
+		return srv.(ConfigServiceServer).UpdateRunner(ctx, req.(*UpdateRunnerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ConfigService_DeleteLanguage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteLanguageRequest)
+func _ConfigService_DeleteRunner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteRunnerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConfigServiceServer).DeleteLanguage(ctx, in)
+		return srv.(ConfigServiceServer).DeleteRunner(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ConfigService_DeleteLanguage_FullMethodName,
+		FullMethod: ConfigService_DeleteRunner_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConfigServiceServer).DeleteLanguage(ctx, req.(*DeleteLanguageRequest))
+		return srv.(ConfigServiceServer).DeleteRunner(ctx, req.(*DeleteRunnerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -419,24 +419,24 @@ var ConfigService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ConfigServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetLanguages",
-			Handler:    _ConfigService_GetLanguages_Handler,
+			MethodName: "GetRunners",
+			Handler:    _ConfigService_GetRunners_Handler,
 		},
 		{
-			MethodName: "GetLanguage",
-			Handler:    _ConfigService_GetLanguage_Handler,
+			MethodName: "GetRunner",
+			Handler:    _ConfigService_GetRunner_Handler,
 		},
 		{
-			MethodName: "AddLanguage",
-			Handler:    _ConfigService_AddLanguage_Handler,
+			MethodName: "AddRunner",
+			Handler:    _ConfigService_AddRunner_Handler,
 		},
 		{
-			MethodName: "UpdateLanguage",
-			Handler:    _ConfigService_UpdateLanguage_Handler,
+			MethodName: "UpdateRunner",
+			Handler:    _ConfigService_UpdateRunner_Handler,
 		},
 		{
-			MethodName: "DeleteLanguage",
-			Handler:    _ConfigService_DeleteLanguage_Handler,
+			MethodName: "DeleteRunner",
+			Handler:    _ConfigService_DeleteRunner_Handler,
 		},
 		{
 			MethodName: "GetCompares",

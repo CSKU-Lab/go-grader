@@ -8,12 +8,12 @@ import (
 	"github.com/CSKU-Lab/go-grader/tests/testdatas"
 )
 
-func initTest() services.RunnerService {
-	setup.Init(testdatas.Languages, testdatas.Compares)
+func initTest() services.ExecutorService {
+	setup.Init(testdatas.Runners, testdatas.Compares)
 	isolateService := services.NewIsolateService(context.Background())
-	languageService := services.NewLanguageService()
+	runnerService := services.NewRunnerService()
 	compareService := services.NewCompareService()
-	runnerService := services.NewRunnerService(isolateService, languageService, compareService)
+	executorService := services.NewExecutorService(isolateService, runnerService, compareService)
 
-	return runnerService
+	return executorService
 }

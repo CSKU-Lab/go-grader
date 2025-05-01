@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"log"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
@@ -16,7 +17,6 @@ type rabbitmq struct {
 }
 
 func NewRabbitMQ() (messaging.Queue, error) {
-
 	conn, err := amqp.Dial("amqp://admin:password@localhost:5672")
 	if err != nil {
 		return nil, err
@@ -112,6 +112,7 @@ func (r *rabbitmq) Consume(ctx context.Context, queue string, handler func(messa
 		go func() {
 			handler(msg.Body)
 			msg.Ack(false)
+			log.Printf("Message %s consumed", msg.MessageId)
 		}()
 	}
 

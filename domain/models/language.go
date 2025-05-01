@@ -1,14 +1,13 @@
 package models
 
-type LocalLanguage struct {
+type LocalRunner struct {
 	ID          string
 	Path        string
 	NeedCompile bool
 }
 
-type LanguageConfig struct {
+type RunnerConfig struct {
 	ID          string
-	Files       []string
 	BuildScript string
 	RunScript   string
 }

@@ -4,11 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
-	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
+	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
+	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/setup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -16,62 +20,102 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	grpc, close := initgRPCClient()
-	defer close()
+	grpc, closeGRPC := initgRPCClient()
+	defer closeGRPC()
 
-	langRes, err := grpc.GetLanguages(ctx, &pb.GetLanguagesRequest{})
+	runnerRes, err := grpc.GetRunners(ctx, &pb.GetRunnersRequest{})
 	if err != nil {
 		log.Fatalln("Cannot get languages from gRPC server : ", err)
 	}
 
 	compareRes, err := grpc.GetCompares(ctx, &emptypb.Empty{})
+	if err != nil {
+		log.Fatalln("Cannot get compares from gRPC server : ", err)
+	}
 
-	languages := langPbToModel(langRes.Languages)
+	runners := runnerPbToModel(runnerRes.Runners)
 	compares := comparePbToModel(compareRes.Compares)
 
-	setup.Init(languages, compares)
+	setup.Init(runners, compares)
 
 	q, err := queue.NewRabbitMQ()
 	if err != nil {
 		log.Fatalln("Cannot initialize RabbitMQ")
 	}
 
+	runnerService := services.NewRunnerService()
+	compareService := services.NewCompareService()
+
 	isolateService := services.NewIsolateService(ctx)
-	runnerService := services.NewRunnerService(isolateService)
+	executorService := services.NewExecutorService(isolateService, runnerService, compareService)
 
 	log.Println("Worker is ready to start working 🤖...")
 
-	// q.Consume(ctx, "running", func(message []byte) {
-	// 	execution := &models.Execution{}
-	//
-	// 	err := json.Unmarshal(message, execution)
-	// 	if err != nil {
-	// 		log.Fatalln("Cannot unmarshal message")
-	// 	}
-	// 	stdOut, stdErr, metadata, err := runnerService.Run(execution)
-	// 	if err != nil {
-	// 		log.Fatalln("Error from runner ", err)
-	// 	}
-	//
-	// 	log.Println(stdOut, stdErr, metadata)
-	// })
+	go func() {
+		err := q.Consume(ctx, "running", func(message []byte) {
+			execution := &models.Execution{}
 
-	q.Consume(ctx, "execution", func(message []byte) {
+			err := json.Unmarshal(message, execution)
+			if err != nil {
+				log.Fatalln("Cannot unmarshal message")
+			}
+
+			executor := executorService.NewExecutor()
+			defer executor.Cleanup()
+
+			executor.SetRunner(execution.RunnerID)
+			executor.SetFiles(execution.Files)
+
+			result, err := executor.Run()
+			if err != nil {
+				log.Fatalln("Error from runner ", err)
+			}
+
+			log.Println(result)
+		})
+		if err != nil {
+			log.Fatalln("Cannot consume message from the queue: ", err)
+		}
+	}()
+
+	go q.Consume(ctx, "grading", func(message []byte) {
 		execution := &models.Execution{}
 
 		err := json.Unmarshal(message, execution)
 		if err != nil {
 			log.Fatalln("Cannot unmarshal message")
 		}
-		stdOut, stdErr, metadata, err := runnerService.Run(execution)
+
+		executor := executorService.NewExecutor()
+		executor.SetRunner(execution.RunnerID)
+		executor.SetFiles(execution.Files)
+
+		result, err := executor.Grade()
 		if err != nil {
 			log.Fatalln("Error from runner ", err)
 		}
 
-		log.Println(stdOut, stdErr, metadata)
+		log.Println(result)
 	})
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	sig := <-sigs
+	log.Printf("Receive %s signal from OS, going to shutdown...\n", sig)
+	timer := time.AfterFunc(10*time.Second, func() {
+		log.Println("Server couldn't stop grafully in time. Doing force stop.")
+	})
+	defer timer.Stop()
+	cancel()
+
+	q.Close()
+	log.Println("RabbitMQ connection is closed.")
+	closeGRPC()
+	log.Println("gRPC connection is closed.")
+	log.Println("Successfully gracefully shutdown the server :D")
 }
 
 func initgRPCClient() (client pb.ConfigServiceClient, close func()) {
@@ -87,24 +131,22 @@ func initgRPCClient() (client pb.ConfigServiceClient, close func()) {
 	}
 }
 
-func langPbToModel(languages []*pb.Language) []models.LanguageConfig {
-	_languages := make([]models.LanguageConfig, 10)
+func runnerPbToModel(languages []*pb.Runner) []models.RunnerConfig {
+	_runners := make([]models.RunnerConfig, 0, 10)
 	for _, lang := range languages {
-		_languages = append(_languages, models.LanguageConfig{
+		_runners = append(_runners, models.RunnerConfig{
 			ID:          lang.GetId(),
 			BuildScript: lang.GetBuildScript(),
 			RunScript:   lang.GetRunScript(),
-			Files:       lang.GetFileNames(),
 		})
 	}
-	return _languages
+	return _runners
 }
 
 func comparePbToModel(compares []*pb.CompareResponse) []models.CompareConfig {
-	_compares := make([]models.CompareConfig, 10)
+	_compares := make([]models.CompareConfig, 0, 10)
 	for _, compare := range compares {
-
-		files := make([]models.File, 10)
+		files := make([]models.File, 0, 10)
 		for _, file := range compare.GetFiles() {
 			files = append(files, models.File{
 				Name:    file.GetName(),
@@ -113,8 +155,11 @@ func comparePbToModel(compares []*pb.CompareResponse) []models.CompareConfig {
 		}
 
 		_compares = append(_compares, models.CompareConfig{
-			ID:    compare.GetId(),
-			Files: files,
+			ID:          compare.GetId(),
+			Files:       files,
+			BuildScript: compare.GetBuildScript(),
+			RunScript:   compare.GetRunScript(),
+			RunName:     compare.GetRunName(),
 		})
 	}
 	return _compares

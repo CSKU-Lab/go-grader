@@ -57,7 +57,7 @@ func (i *IsolateInstance) log(format string, args ...any) {
 }
 
 func (i *IsolateInstance) logFatalf(format string, args ...any) {
-	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
+	log.Fatalf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
 func (s *IsolateInstance) execute(args ...string) error {

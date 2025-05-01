@@ -10,21 +10,21 @@ import (
 	"github.com/CSKU-Lab/go-grader/domain/models"
 )
 
-type runnerService struct {
-	isolateService  *IsolateService
-	languageService *LanguageService
-	compareService  *CompareService
+type executorService struct {
+	isolateService *IsolateService
+	runnerService  *RunnerService
+	compareService *CompareService
 }
 
-type RunnerService interface {
-	NewRunner() Runner
+type ExecutorService interface {
+	NewExecutor() Executor
 }
 
-func NewRunnerService(isolateService *IsolateService, languageService *LanguageService, compareService *CompareService) RunnerService {
-	return &runnerService{
-		isolateService:  isolateService,
-		languageService: languageService,
-		compareService:  compareService,
+func NewExecutorService(isolateService *IsolateService, runnerService *RunnerService, compareService *CompareService) ExecutorService {
+	return &executorService{
+		isolateService: isolateService,
+		runnerService:  runnerService,
+		compareService: compareService,
 	}
 }
 
@@ -34,20 +34,20 @@ type Result struct {
 	Metadata *models.Metadata
 }
 
-type runner struct {
-	instance        *IsolateInstance
-	languageService *LanguageService
-	compareService  *CompareService
-	lang            *models.LocalLanguage
-	comparePath     string
-	limits          *models.Limit
-	hasInput        bool
-	testcases       []models.TestCase
+type executor struct {
+	instance       *IsolateInstance
+	runnerService  *RunnerService
+	compareService *CompareService
+	lang           *models.LocalRunner
+	comparePath    string
+	limits         *models.Limit
+	hasInput       bool
+	testcases      []models.TestCase
 }
 
-type Runner interface {
+type Executor interface {
 	Cleanup() error
-	SetLanguage(ID string) error
+	SetRunner(ID string) error
 	SetFiles(files []models.File) error
 	SetInput(input string) error
 	SetLimits(limits *models.Limit)
@@ -57,20 +57,20 @@ type Runner interface {
 	Grade() (*models.GradeResult, error)
 }
 
-func (r *runnerService) NewRunner() Runner {
-	return &runner{
-		instance:        r.isolateService.NewInstance(),
-		languageService: r.languageService,
-		compareService:  r.compareService,
+func (r *executorService) NewExecutor() Executor {
+	return &executor{
+		instance:       r.isolateService.NewInstance(),
+		runnerService:  r.runnerService,
+		compareService: r.compareService,
 	}
 }
 
-func (r *runner) Cleanup() error {
+func (r *executor) Cleanup() error {
 	return r.instance.Cleanup()
 }
 
-func (r *runner) SetLanguage(ID string) error {
-	language, err := r.languageService.GetByID(ID)
+func (r *executor) SetRunner(ID string) error {
+	language, err := r.runnerService.GetByID(ID)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (r *runner) SetLanguage(ID string) error {
 	return nil
 }
 
-func (r *runner) SetFiles(files []models.File) error {
+func (r *executor) SetFiles(files []models.File) error {
 	for _, file := range files {
 		if err := r.instance.CreateFile(file.Name, file.Content, 0655); err != nil {
 			return err
@@ -88,12 +88,12 @@ func (r *runner) SetFiles(files []models.File) error {
 	return nil
 }
 
-func (r *runner) SetInput(input string) error {
+func (r *executor) SetInput(input string) error {
 	r.hasInput = true
 	return r.instance.CreateFile("input", input, 0644)
 }
 
-func (r *runner) compile() (*models.RunResult, error) {
+func (r *executor) compile() (*models.RunResult, error) {
 	err := r.instance.CompileUsing(r.lang.Path)
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -115,7 +115,7 @@ func (r *runner) compile() (*models.RunResult, error) {
 	return nil, nil
 }
 
-func (r *runner) run() (*Result, error) {
+func (r *executor) run() (*Result, error) {
 	err := r.instance.Run(r.lang.Path, r.limits, r.hasInput)
 	if err != nil {
 		return nil, err
@@ -143,18 +143,18 @@ func (r *runner) run() (*Result, error) {
 	}, nil
 }
 
-func (r *runner) SetLimits(limits *models.Limit) {
+func (r *executor) SetLimits(limits *models.Limit) {
 	r.limits = limits
 }
 
-func (r *runner) SetTestCases(testCases []models.TestCase) {
+func (r *executor) SetTestCases(testCases []models.TestCase) {
 	if r.comparePath == "" {
 		log.Fatalln("You need to set compare ID before setting test cases")
 	}
 	r.testcases = testCases
 }
 
-func (r *runner) SetCompareID(ID string) {
+func (r *executor) SetCompareID(ID string) {
 	compare, err := r.compareService.GetByID(ID)
 	if err != nil {
 		log.Fatalln("Cannot get compare: ", err)
@@ -163,7 +163,7 @@ func (r *runner) SetCompareID(ID string) {
 	r.comparePath = compare.Path
 }
 
-func (r *runner) compare(solOutput string) (string, error) {
+func (r *executor) compare(solOutput string) (string, error) {
 	err := r.instance.CreateFile("sol_output", solOutput, 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to create sol_output file: %w", err)
@@ -182,7 +182,7 @@ func (r *runner) compare(solOutput string) (string, error) {
 	return result, nil
 }
 
-func (r *runner) Run() (*models.RunResult, error) {
+func (r *executor) Run() (*models.RunResult, error) {
 	if r.lang.NeedCompile {
 		result, err := r.compile()
 		if err != nil {
@@ -215,7 +215,7 @@ func (r *runner) Run() (*models.RunResult, error) {
 	return runResult, nil
 }
 
-func (r *runner) Grade() (*models.GradeResult, error) {
+func (r *executor) Grade() (*models.GradeResult, error) {
 	if r.lang.NeedCompile {
 		result, err := r.compile()
 		if err != nil {

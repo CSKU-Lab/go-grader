@@ -25,13 +25,14 @@ var File_config_v1_service_proto protoreflect.FileDescriptor
 
 const file_config_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x17config/v1/service.proto\x12\tconfig.v1\x1a\x18config/v1/compares.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x19config/v1/languages.proto2\x96\x06\n" +
-	"\rConfigService\x12Q\n" +
-	"\fGetLanguages\x12\x1e.config.v1.GetLanguagesRequest\x1a\x1f.config.v1.GetLanguagesResponse\"\x00\x12K\n" +
-	"\vGetLanguage\x12\x1d.config.v1.GetLanguageRequest\x1a\x1b.config.v1.LanguageResponse\"\x00\x12K\n" +
-	"\vAddLanguage\x12\x1d.config.v1.AddLanguageRequest\x1a\x1b.config.v1.LanguageResponse\"\x00\x12Q\n" +
-	"\x0eUpdateLanguage\x12 .config.v1.UpdateLanguageRequest\x1a\x1b.config.v1.LanguageResponse\"\x00\x12L\n" +
-	"\x0eDeleteLanguage\x12 .config.v1.DeleteLanguageRequest\x1a\x16.google.protobuf.Empty\"\x00\x12G\n" +
+	"\x17config/v1/service.proto\x12\tconfig.v1\x1a\x18config/v1/compares.proto\x1a\x17config/v1/runners.proto\x1a\x1bgoogle/protobuf/empty.proto2\xfa\x05\n" +
+	"\rConfigService\x12K\n" +
+	"\n" +
+	"GetRunners\x12\x1c.config.v1.GetRunnersRequest\x1a\x1d.config.v1.GetRunnersResponse\"\x00\x12E\n" +
+	"\tGetRunner\x12\x1b.config.v1.GetRunnerRequest\x1a\x19.config.v1.RunnerResponse\"\x00\x12E\n" +
+	"\tAddRunner\x12\x1b.config.v1.AddRunnerRequest\x1a\x19.config.v1.RunnerResponse\"\x00\x12K\n" +
+	"\fUpdateRunner\x12\x1e.config.v1.UpdateRunnerRequest\x1a\x19.config.v1.RunnerResponse\"\x00\x12H\n" +
+	"\fDeleteRunner\x12\x1e.config.v1.DeleteRunnerRequest\x1a\x16.google.protobuf.Empty\"\x00\x12G\n" +
 	"\vGetCompares\x12\x16.google.protobuf.Empty\x1a\x1e.config.v1.GetComparesResponse\"\x00\x12H\n" +
 	"\n" +
 	"GetCompare\x12\x1c.config.v1.GetCompareRequest\x1a\x1a.config.v1.CompareResponse\"\x00\x12H\n" +
@@ -43,37 +44,37 @@ const file_config_v1_service_proto_rawDesc = "" +
 	"Config::V1b\x06proto3"
 
 var file_config_v1_service_proto_goTypes = []any{
-	(*GetLanguagesRequest)(nil),   // 0: config.v1.GetLanguagesRequest
-	(*GetLanguageRequest)(nil),    // 1: config.v1.GetLanguageRequest
-	(*AddLanguageRequest)(nil),    // 2: config.v1.AddLanguageRequest
-	(*UpdateLanguageRequest)(nil), // 3: config.v1.UpdateLanguageRequest
-	(*DeleteLanguageRequest)(nil), // 4: config.v1.DeleteLanguageRequest
-	(*emptypb.Empty)(nil),         // 5: google.protobuf.Empty
-	(*GetCompareRequest)(nil),     // 6: config.v1.GetCompareRequest
-	(*AddCompareRequest)(nil),     // 7: config.v1.AddCompareRequest
-	(*UpdateCompareRequest)(nil),  // 8: config.v1.UpdateCompareRequest
-	(*DeleteCompareRequest)(nil),  // 9: config.v1.DeleteCompareRequest
-	(*GetLanguagesResponse)(nil),  // 10: config.v1.GetLanguagesResponse
-	(*LanguageResponse)(nil),      // 11: config.v1.LanguageResponse
-	(*GetComparesResponse)(nil),   // 12: config.v1.GetComparesResponse
-	(*CompareResponse)(nil),       // 13: config.v1.CompareResponse
+	(*GetRunnersRequest)(nil),    // 0: config.v1.GetRunnersRequest
+	(*GetRunnerRequest)(nil),     // 1: config.v1.GetRunnerRequest
+	(*AddRunnerRequest)(nil),     // 2: config.v1.AddRunnerRequest
+	(*UpdateRunnerRequest)(nil),  // 3: config.v1.UpdateRunnerRequest
+	(*DeleteRunnerRequest)(nil),  // 4: config.v1.DeleteRunnerRequest
+	(*emptypb.Empty)(nil),        // 5: google.protobuf.Empty
+	(*GetCompareRequest)(nil),    // 6: config.v1.GetCompareRequest
+	(*AddCompareRequest)(nil),    // 7: config.v1.AddCompareRequest
+	(*UpdateCompareRequest)(nil), // 8: config.v1.UpdateCompareRequest
+	(*DeleteCompareRequest)(nil), // 9: config.v1.DeleteCompareRequest
+	(*GetRunnersResponse)(nil),   // 10: config.v1.GetRunnersResponse
+	(*RunnerResponse)(nil),       // 11: config.v1.RunnerResponse
+	(*GetComparesResponse)(nil),  // 12: config.v1.GetComparesResponse
+	(*CompareResponse)(nil),      // 13: config.v1.CompareResponse
 }
 var file_config_v1_service_proto_depIdxs = []int32{
-	0,  // 0: config.v1.ConfigService.GetLanguages:input_type -> config.v1.GetLanguagesRequest
-	1,  // 1: config.v1.ConfigService.GetLanguage:input_type -> config.v1.GetLanguageRequest
-	2,  // 2: config.v1.ConfigService.AddLanguage:input_type -> config.v1.AddLanguageRequest
-	3,  // 3: config.v1.ConfigService.UpdateLanguage:input_type -> config.v1.UpdateLanguageRequest
-	4,  // 4: config.v1.ConfigService.DeleteLanguage:input_type -> config.v1.DeleteLanguageRequest
+	0,  // 0: config.v1.ConfigService.GetRunners:input_type -> config.v1.GetRunnersRequest
+	1,  // 1: config.v1.ConfigService.GetRunner:input_type -> config.v1.GetRunnerRequest
+	2,  // 2: config.v1.ConfigService.AddRunner:input_type -> config.v1.AddRunnerRequest
+	3,  // 3: config.v1.ConfigService.UpdateRunner:input_type -> config.v1.UpdateRunnerRequest
+	4,  // 4: config.v1.ConfigService.DeleteRunner:input_type -> config.v1.DeleteRunnerRequest
 	5,  // 5: config.v1.ConfigService.GetCompares:input_type -> google.protobuf.Empty
 	6,  // 6: config.v1.ConfigService.GetCompare:input_type -> config.v1.GetCompareRequest
 	7,  // 7: config.v1.ConfigService.AddCompare:input_type -> config.v1.AddCompareRequest
 	8,  // 8: config.v1.ConfigService.UpdateCompare:input_type -> config.v1.UpdateCompareRequest
 	9,  // 9: config.v1.ConfigService.DeleteCompare:input_type -> config.v1.DeleteCompareRequest
-	10, // 10: config.v1.ConfigService.GetLanguages:output_type -> config.v1.GetLanguagesResponse
-	11, // 11: config.v1.ConfigService.GetLanguage:output_type -> config.v1.LanguageResponse
-	11, // 12: config.v1.ConfigService.AddLanguage:output_type -> config.v1.LanguageResponse
-	11, // 13: config.v1.ConfigService.UpdateLanguage:output_type -> config.v1.LanguageResponse
-	5,  // 14: config.v1.ConfigService.DeleteLanguage:output_type -> google.protobuf.Empty
+	10, // 10: config.v1.ConfigService.GetRunners:output_type -> config.v1.GetRunnersResponse
+	11, // 11: config.v1.ConfigService.GetRunner:output_type -> config.v1.RunnerResponse
+	11, // 12: config.v1.ConfigService.AddRunner:output_type -> config.v1.RunnerResponse
+	11, // 13: config.v1.ConfigService.UpdateRunner:output_type -> config.v1.RunnerResponse
+	5,  // 14: config.v1.ConfigService.DeleteRunner:output_type -> google.protobuf.Empty
 	12, // 15: config.v1.ConfigService.GetCompares:output_type -> config.v1.GetComparesResponse
 	13, // 16: config.v1.ConfigService.GetCompare:output_type -> config.v1.CompareResponse
 	13, // 17: config.v1.ConfigService.AddCompare:output_type -> config.v1.CompareResponse
@@ -92,7 +93,7 @@ func file_config_v1_service_proto_init() {
 		return
 	}
 	file_config_v1_compares_proto_init()
-	file_config_v1_languages_proto_init()
+	file_config_v1_runners_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
