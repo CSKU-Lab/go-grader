@@ -9,9 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
-	pb "github.com/CSKU-Lab/go-grader/genproto/config/v1"
+	configPB "github.com/CSKU-Lab/go-grader/genproto/config/v1"
+	taskPB "github.com/CSKU-Lab/go-grader/genproto/task/v1"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/setup"
 	"google.golang.org/grpc"
@@ -20,17 +22,22 @@ import (
 )
 
 func main() {
+	env := configs.NewEnv()
+
 	ctx, cancel := context.WithCancel(context.Background())
 
-	grpc, closeGRPC := initgRPCClient()
-	defer closeGRPC()
+	configGRPC, closeConfig := initConfigServerClient(env.GetConfigServerURL())
+	defer closeConfig()
 
-	runnerRes, err := grpc.GetRunners(ctx, &pb.GetRunnersRequest{})
+	_, closeTask := initTaskServerClient(env.GetTaskServerURL())
+	defer closeTask()
+
+	runnerRes, err := configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
 	if err != nil {
 		log.Fatalln("Cannot get languages from gRPC server : ", err)
 	}
 
-	compareRes, err := grpc.GetCompares(ctx, &emptypb.Empty{})
+	compareRes, err := configGRPC.GetCompares(ctx, &emptypb.Empty{})
 	if err != nil {
 		log.Fatalln("Cannot get compares from gRPC server : ", err)
 	}
@@ -113,25 +120,38 @@ func main() {
 
 	q.Close()
 	log.Println("RabbitMQ connection is closed.")
-	closeGRPC()
+	closeConfig()
 	log.Println("gRPC connection is closed.")
 	log.Println("Successfully gracefully shutdown the server :D")
 }
 
-func initgRPCClient() (client pb.ConfigServiceClient, close func()) {
-	conn, err := grpc.NewClient("host.docker.internal:8081", grpc.WithTransportCredentials(insecure.NewCredentials()))
+func initConfigServerClient(clientAddr string) (client configPB.ConfigServiceClient, close func()) {
+	conn, err := grpc.NewClient(clientAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect to gRPC server: %v", err)
 	}
 
-	c := pb.NewConfigServiceClient(conn)
+	c := configPB.NewConfigServiceClient(conn)
 
 	return c, func() {
 		conn.Close()
 	}
 }
 
-func runnerPbToModel(languages []*pb.Runner) []models.RunnerConfig {
+func initTaskServerClient(clientAddr string) (client taskPB.TaskServiceClient, close func()) {
+	conn, err := grpc.NewClient(clientAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect to gRPC server: %v", err)
+	}
+
+	c := taskPB.NewTaskServiceClient(conn)
+
+	return c, func() {
+		conn.Close()
+	}
+}
+
+func runnerPbToModel(languages []*configPB.Runner) []models.RunnerConfig {
 	_runners := make([]models.RunnerConfig, 0, 10)
 	for _, lang := range languages {
 		_runners = append(_runners, models.RunnerConfig{
@@ -143,7 +163,7 @@ func runnerPbToModel(languages []*pb.Runner) []models.RunnerConfig {
 	return _runners
 }
 
-func comparePbToModel(compares []*pb.CompareResponse) []models.CompareConfig {
+func comparePbToModel(compares []*configPB.CompareResponse) []models.CompareConfig {
 	_compares := make([]models.CompareConfig, 0, 10)
 	for _, compare := range compares {
 		files := make([]models.File, 0, 10)
