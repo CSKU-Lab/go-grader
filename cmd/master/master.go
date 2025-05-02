@@ -22,7 +22,7 @@ func main() {
 		Files: []models.File{
 			{
 				Name:    "main.py",
-				Content: `print("Hello" + input())`,
+				Content: `print("Hello",input())`,
 			},
 		},
 		RunnerID: "python_3_11_2",

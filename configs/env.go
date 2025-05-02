@@ -40,8 +40,8 @@ func (m *env) GetConfigServerURL() string {
 }
 
 func (m *env) GetTaskServerURL() string {
-	if m.configServerURL == "" {
+	if m.taskServerURL == "" {
 		log.Fatalln("You forget to set the TASK_SERVER_URL environment variable!")
 	}
-	return m.configServerURL
+	return m.taskServerURL
 }

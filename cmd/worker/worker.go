@@ -99,12 +99,13 @@ func main() {
 			Id: execution.TaskID,
 		})
 		if err != nil {
-			log.Println("Cannot get task from gRPC server: ", err)
+			log.Fatalln("Cannot get task from gRPC server: ", err)
 		}
 
 		executor := executorService.NewExecutor()
 		executor.SetRunner(execution.RunnerID)
 		executor.SetFiles(execution.Files)
+		executor.SetCompareID(task.CompareId)
 		executor.SetTestCases(func() []models.TestCase {
 			var testCases []models.TestCase
 			for _, testcase := range task.Testcases {
