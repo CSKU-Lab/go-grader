@@ -29,7 +29,7 @@ func main() {
 	configGRPC, closeConfig := initConfigServerClient(env.GetConfigServerURL())
 	defer closeConfig()
 
-	_, closeTask := initTaskServerClient(env.GetTaskServerURL())
+	taskGRPC, closeTask := initTaskServerClient(env.GetTaskServerURL())
 	defer closeTask()
 
 	runnerRes, err := configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
@@ -95,9 +95,27 @@ func main() {
 			log.Fatalln("Cannot unmarshal message")
 		}
 
+		task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{
+			Id: execution.TaskID,
+		})
+		if err != nil {
+			log.Println("Cannot get task from gRPC server: ", err)
+		}
+
 		executor := executorService.NewExecutor()
 		executor.SetRunner(execution.RunnerID)
 		executor.SetFiles(execution.Files)
+		executor.SetTestCases(func() []models.TestCase {
+			var testCases []models.TestCase
+			for _, testcase := range task.Testcases {
+				testCases = append(testCases, models.TestCase{
+					ID:     testcase.Id,
+					Input:  testcase.Input,
+					Output: testcase.Output,
+				})
+			}
+			return testCases
+		}())
 
 		result, err := executor.Grade()
 		if err != nil {

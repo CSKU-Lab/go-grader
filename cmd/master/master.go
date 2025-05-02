@@ -22,10 +22,11 @@ func main() {
 		Files: []models.File{
 			{
 				Name:    "main.py",
-				Content: `print("Hello World")`,
+				Content: `print("Hello" + input())`,
 			},
 		},
 		RunnerID: "python_3_11_2",
+		TaskID:   "1",
 	}
 
 	message, err := json.Marshal(&execution)
@@ -33,8 +34,8 @@ func main() {
 		log.Fatalln("Cannot parse execution struct to json")
 	}
 
-	for range 10 {
-		err = rb.Publish(ctx, "running", message)
+	for range 1 {
+		err = rb.Publish(ctx, "grading", message)
 		if err != nil {
 			log.Fatalln("Cannot publish message to the execution queue")
 		}

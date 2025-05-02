@@ -5,4 +5,6 @@ docker build -t worker -f docker/worker/Dockerfile .
 docker run --rm --privileged \
     --name worker \
     --network host \
+    --env-file .env \
+    --env ENV=docker \
     worker
