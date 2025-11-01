@@ -21,7 +21,7 @@ type runResultRow struct {
 	Memory   int32   `db:"memory"`
 }
 
-type gradeResultRow struct {
+type gradedResultRow struct {
 	ID     string `db:"id"`
 	Status string `db:"status"`
 	Error  string `db:"error"`
@@ -57,8 +57,8 @@ func (s *sqlxInstance) CreateRunResult(ctx context.Context, id string, result *m
 	return nil
 }
 
-func (s *sqlxInstance) CreateGradeResult(ctx context.Context, id string, result *models.GradeResult) error {
-	gradeResultQuery := `INSERT INTO grade_results (id, status, error) VALUES ($1, $2, $3)`
+func (s *sqlxInstance) CreateGradedResult(ctx context.Context, id string, result *models.GradedResult) error {
+	gradeResultQuery := `INSERT INTO grade_results (id, status, avg_wall_time, avg_memory) VALUES ($1, $2, $3, $4, $5)`
 
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -66,7 +66,7 @@ func (s *sqlxInstance) CreateGradeResult(ctx context.Context, id string, result 
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx, gradeResultQuery, id, result.Status, result.Error)
+	_, err = tx.ExecContext(ctx, gradeResultQuery, id, result.Status, result.AvgWallTime, result.AvgMemory)
 	if err != nil {
 		return err
 	}
@@ -101,16 +101,16 @@ func (s *sqlxInstance) GetRunResultByID(ctx context.Context, id string) (*models
 	}, nil
 }
 
-func (s *sqlxInstance) GetGradeResultByID(ctx context.Context, id string) (*models.GradeResult, error) {
+func (s *sqlxInstance) GetGradedResultByID(ctx context.Context, id string) (*models.StoredGradedResult, error) {
 	gradeResultQuery := `SELECT id, status, error FROM grade_results WHERE id = $1`
 
-	var gradeResult gradeResultRow
+	var gradeResult gradedResultRow
 	err := s.db.GetContext(ctx, &gradeResult, gradeResultQuery, id)
 	if err != nil {
 		return nil, err
 	}
 
-	var testCaseResults []models.TestCaseResult
+	var testCaseResults []models.StoredTestCaseResult
 
 	testCaseQuery := `SELECT test_case_id, grade_result_id, status, output, message, wall_time, memory FROM test_case_results WHERE grade_result_id = $1`
 
@@ -121,20 +121,19 @@ func (s *sqlxInstance) GetGradeResultByID(ctx context.Context, id string) (*mode
 	}
 
 	for _, row := range testCaseResultRows {
-		testCaseResults = append(testCaseResults, models.TestCaseResult{
+		testCaseResults = append(testCaseResults, models.StoredTestCaseResult{
 			ID:       row.TestCaseID,
 			Status:   execution.Status(row.Status),
-			StdOut:   row.Output,
+			Output:   row.Output,
 			Message:  row.Message,
 			WallTime: row.WallTime,
 			Memory:   row.Memory,
 		})
 	}
 
-	return &models.GradeResult{
+	return &models.StoredGradedResult{
 		ID:              gradeResult.ID,
 		Status:          execution.Status(gradeResult.Status),
-		Error:           gradeResult.Error,
 		TestCaseResults: testCaseResults,
 	}, nil
 

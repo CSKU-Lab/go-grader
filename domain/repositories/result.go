@@ -8,7 +8,7 @@ import (
 
 type Result interface {
 	CreateRunResult(ctx context.Context, id string, result *models.RunResult) error
-	CreateGradeResult(ctx context.Context, id string, result *models.GradeResult) error
 	GetRunResultByID(ctx context.Context, id string) (*models.StoredRunResult, error)
-	GetGradeResultByID(ctx context.Context, id string) (*models.GradeResult, error)
+	CreateGradedResult(ctx context.Context, id string, result *models.GradedResult) error
+	GetGradedResultByID(ctx context.Context, id string) (*models.StoredGradedResult, error)
 }

@@ -102,12 +102,12 @@ func main() {
 
 			result.ID = execution.ID
 
-			j, err := json.Marshal(result)
+			bytesResult, err := json.Marshal(result)
 			if err != nil {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "run_results", j)
+			err = q.Publish(ctx, "run_results", bytesResult)
 			if err != nil {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
@@ -135,13 +135,13 @@ func main() {
 		}
 
 		executor := executorService.NewExecutor()
-		if err := executor.SetRunner(execution.RunnerID); err != nil {
+		if err := executor.SetRunner(task.GetRunnerId()); err != nil {
 			logger.Fatalw("Cannot set runner", "error", err)
 		}
 		if err := executor.SetFiles(execution.Files); err != nil {
 			logger.Fatalw("Cannot set files", "error", err)
 		}
-		executor.SetCompareID(task.CompareId)
+		executor.SetCompareID(task.GetCompareId())
 		executor.SetTestCases(func() []models.TestCase {
 			var testCases []models.TestCase
 			for _, testcase := range task.Testcases {
@@ -159,7 +159,19 @@ func main() {
 			logger.Fatalw("Error from runner", "error", err)
 		}
 
-		logger.Infow("Grading finished", "result", result)
+		logger.Infow("Grading finished", result)
+
+		result.ID = execution.ID
+
+		bytesResult, err := json.Marshal(result)
+		if err != nil {
+			logger.Errorw("Cannot marshal grade result", "error", err)
+		}
+
+		err = q.Publish(ctx, "grade_results", bytesResult)
+		if err != nil {
+			logger.Errorw("Cannot publish grade result to the queue", "error", err)
+		}
 	})
 
 	sigs := make(chan os.Signal, 1)

@@ -186,6 +186,65 @@ func (s *graderGRPCServer) GetRunResult(ctx context.Context, req *pb.GetRunResul
 	}, nil
 }
 
+func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradedResponse, error) {
+	id := generators.UUID()
+
+	var files = make([]models.File, len(req.Files))
+	for i, file := range req.GetFiles() {
+		files[i] = models.File{
+			Name:    file.GetName(),
+			Content: file.GetContent(),
+		}
+	}
+
+	execution := models.GradeExecution{
+		ID:     id,
+		Files:  files,
+		TaskID: req.GetTaskId(),
+	}
+
+	message, err := json.Marshal(&execution)
+	if err != nil {
+		s.logger.Fatalw("Cannot parse execution struct to json", "error", err)
+	}
+
+	err = s.q.Publish(ctx, "grade", message)
+	if err != nil {
+		s.logger.Fatalw("Cannot publish message to the execution queue", "error", err)
+	}
+	s.logger.Info("Publish message to the queue successfully!")
+
+	return &pb.GradedResponse{
+		ExecutionId: id,
+	}, nil
+}
+
+func (s *graderGRPCServer) GetGradeResult(ctx context.Context, req *pb.GetGradedResultRequest) (*pb.GradedResultResponse, error) {
+	result, err := s.service.GetGradedResultByID(ctx, req.GetExecutionId())
+	if err != nil {
+		return nil, err
+	}
+
+	var testCaseResults = make([]*pb.TestCaseResult, len(result.TestCaseResults))
+	for i, testCaseResult := range result.TestCaseResults {
+		testCaseResults[i] = &pb.TestCaseResult{
+			TestCaseId: testCaseResult.ID,
+			Status:     executionStatusToProtoStatus(testCaseResult.Status),
+			Output:     testCaseResult.Output,
+			Message:    testCaseResult.Message,
+			WallTime:   testCaseResult.WallTime,
+			Memory:     testCaseResult.Memory,
+		}
+	}
+
+	return &pb.GradedResultResponse{
+		ExecutionId: result.ID,
+		Status:      executionStatusToProtoStatus(result.Status),
+		AvgWallTime: result.AvgWallTime,
+		AvgMemory:   result.AvgMemory,
+	}, nil
+}
+
 func executionStatusToProtoStatus(status execution.Status) pb.ExecutionStatus {
 	switch status {
 	case execution.COMPILE_FAILED:

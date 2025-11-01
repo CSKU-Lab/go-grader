@@ -54,8 +54,12 @@ table "grade_results" {
     type = enum.execution_status
   }
 
-  column "error" {
-    type = text
+  column "avg_wall_time" {
+    type = float
+  }
+
+  column "avg_memory" {
+    type = int
   }
 
   primary_key {

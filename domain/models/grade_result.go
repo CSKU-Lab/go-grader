@@ -12,9 +12,27 @@ type TestCaseResult struct {
 	StdErr   string
 }
 
-type GradeResult struct {
+type GradedResult struct {
 	ID              string
 	Status          execution.Status
-	Error           string
 	TestCaseResults []TestCaseResult
+	AvgWallTime     float32
+	AvgMemory       int32
+}
+
+type StoredGradedResult struct {
+	ID              string
+	Status          execution.Status
+	TestCaseResults []StoredTestCaseResult
+	AvgWallTime     float32
+	AvgMemory       int32
+}
+
+type StoredTestCaseResult struct {
+	ID       string
+	Status   execution.Status
+	Output   string
+	Message  string
+	WallTime float32
+	Memory   int32
 }

@@ -26,7 +26,8 @@ type Task struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Solution      string                 `protobuf:"bytes,2,opt,name=solution,proto3" json:"solution,omitempty"`
 	Testcases     []*TestCase            `protobuf:"bytes,3,rep,name=testcases,proto3" json:"testcases,omitempty"`
-	CompareId     string                 `protobuf:"bytes,4,opt,name=compare_id,json=compareId,proto3" json:"compare_id,omitempty"`
+	RunnerId      string                 `protobuf:"bytes,4,opt,name=runner_id,json=runnerId,proto3" json:"runner_id,omitempty"`
+	CompareId     string                 `protobuf:"bytes,5,opt,name=compare_id,json=compareId,proto3" json:"compare_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,6 +81,13 @@ func (x *Task) GetTestcases() []*TestCase {
 		return x.Testcases
 	}
 	return nil
+}
+
+func (x *Task) GetRunnerId() string {
+	if x != nil {
+		return x.RunnerId
+	}
+	return ""
 }
 
 func (x *Task) GetCompareId() string {
@@ -501,13 +509,14 @@ var File_task_v1_service_proto protoreflect.FileDescriptor
 
 const file_task_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x15task/v1/service.proto\x12\atask.v1\"\x82\x01\n" +
+	"\x15task/v1/service.proto\x12\atask.v1\"\x9f\x01\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bsolution\x18\x02 \x01(\tR\bsolution\x12/\n" +
-	"\ttestcases\x18\x03 \x03(\v2\x11.task.v1.TestCaseR\ttestcases\x12\x1d\n" +
+	"\ttestcases\x18\x03 \x03(\v2\x11.task.v1.TestCaseR\ttestcases\x12\x1b\n" +
+	"\trunner_id\x18\x04 \x01(\tR\brunnerId\x12\x1d\n" +
 	"\n" +
-	"compare_id\x18\x04 \x01(\tR\tcompareId\"H\n" +
+	"compare_id\x18\x05 \x01(\tR\tcompareId\"H\n" +
 	"\bTestCase\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05input\x18\x02 \x01(\tR\x05input\x12\x16\n" +

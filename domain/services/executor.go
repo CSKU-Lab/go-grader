@@ -57,7 +57,7 @@ type Executor interface {
 	SetTestCases(testCases []models.TestCase)
 	SetCompareID(ID string)
 	Run() (*models.RunResult, error)
-	Grade() (*models.GradeResult, error)
+	Grade() (*models.GradedResult, error)
 }
 
 func (r *executorService) NewExecutor() Executor {
@@ -219,21 +219,23 @@ func (r *executor) Run() (*models.RunResult, error) {
 	return runResult, nil
 }
 
-func (r *executor) Grade() (*models.GradeResult, error) {
+func (r *executor) Grade() (*models.GradedResult, error) {
 	if r.lang.NeedCompile {
 		result, err := r.compile()
 		if err != nil {
 			return nil, err
 		}
 
+		// this mean compilation failed
 		if result != nil {
-			return &models.GradeResult{
+			return &models.GradedResult{
 				Status: result.Status,
-				Error:  result.StdErr,
 			}, nil
 		}
 	}
 
+	totalWallTime := float32(0)
+	totalMemory := int32(0)
 	gradedStatus := execution.RUN_PASSED
 	var testCaseResults []models.TestCaseResult
 	for _, testCase := range r.testcases {
@@ -255,6 +257,9 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 		testCaseResult.StdErr = result.StdErr
 		testCaseResult.WallTime = result.Metadata.WallTime
 		testCaseResult.Memory = result.Metadata.Memory
+
+		totalWallTime += result.Metadata.WallTime
+		totalMemory = result.Metadata.Memory
 
 		isFailed := false
 
@@ -309,8 +314,10 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 
 		r.hasInput = false
 	}
-	return &models.GradeResult{
+	return &models.GradedResult{
 		Status:          gradedStatus,
 		TestCaseResults: testCaseResults,
+		AvgWallTime:     totalWallTime / float32(len(r.testcases)),
+		AvgMemory:       totalMemory / int32(len(r.testcases)),
 	}, nil
 }
