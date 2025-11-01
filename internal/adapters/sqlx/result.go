@@ -22,9 +22,10 @@ type runResultRow struct {
 }
 
 type gradedResultRow struct {
-	ID     string `db:"id"`
-	Status string `db:"status"`
-	Error  string `db:"error"`
+	ID          string  `db:"id"`
+	Status      string  `db:"status"`
+	AvgWallTime float32 `db:"avg_wall_time"`
+	AvgMemory   int32   `db:"avg_memory"`
 }
 
 type testCaseResultRow struct {
@@ -45,7 +46,7 @@ func (s *sqlxInstance) CreateRunResult(ctx context.Context, id string, result *m
 	query := `INSERT INTO run_results (id, status, output, wall_time, memory) VALUES ($1, $2, $3, $4, $5)`
 
 	output := result.StdOut
-	if result.StdOut == "" {
+	if output == "" {
 		output = result.StdErr
 	}
 
@@ -57,8 +58,8 @@ func (s *sqlxInstance) CreateRunResult(ctx context.Context, id string, result *m
 	return nil
 }
 
-func (s *sqlxInstance) CreateGradedResult(ctx context.Context, id string, result *models.GradedResult) error {
-	gradeResultQuery := `INSERT INTO grade_results (id, status, avg_wall_time, avg_memory) VALUES ($1, $2, $3, $4, $5)`
+func (s *sqlxInstance) CreateGradeResult(ctx context.Context, id string, result *models.GradeResult) error {
+	gradeResultQuery := `INSERT INTO grade_results (id, status, avg_wall_time, avg_memory) VALUES ($1, $2, $3, $4)`
 
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -74,9 +75,14 @@ func (s *sqlxInstance) CreateGradedResult(ctx context.Context, id string, result
 	testCaseResultQuery := `INSERT INTO test_case_results (test_case_id, grade_result_id, status, output, message, wall_time, memory) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	for _, testCaseResult := range result.TestCaseResults {
-		_, err = tx.ExecContext(ctx, testCaseResultQuery, testCaseResult.ID, "test", testCaseResult.Status, testCaseResult.Message, testCaseResult.WallTime, testCaseResult.Memory, testCaseResult.StdOut, testCaseResult.StdErr)
+		output := testCaseResult.StdOut
+		if output == "" {
+			output = testCaseResult.StdErr
+		}
+
+		_, err = tx.ExecContext(ctx, testCaseResultQuery, testCaseResult.ID, id, testCaseResult.Status, output, testCaseResult.Message, testCaseResult.WallTime, testCaseResult.Memory)
 		if err != nil {
-			break
+			return err
 		}
 	}
 
@@ -101,8 +107,8 @@ func (s *sqlxInstance) GetRunResultByID(ctx context.Context, id string) (*models
 	}, nil
 }
 
-func (s *sqlxInstance) GetGradedResultByID(ctx context.Context, id string) (*models.StoredGradedResult, error) {
-	gradeResultQuery := `SELECT id, status, error FROM grade_results WHERE id = $1`
+func (s *sqlxInstance) GetGradeResultByID(ctx context.Context, id string) (*models.StoredGradeResult, error) {
+	gradeResultQuery := `SELECT id, status, avg_wall_time, avg_memory FROM grade_results WHERE id = $1`
 
 	var gradeResult gradedResultRow
 	err := s.db.GetContext(ctx, &gradeResult, gradeResultQuery, id)
@@ -131,9 +137,11 @@ func (s *sqlxInstance) GetGradedResultByID(ctx context.Context, id string) (*mod
 		})
 	}
 
-	return &models.StoredGradedResult{
+	return &models.StoredGradeResult{
 		ID:              gradeResult.ID,
 		Status:          execution.Status(gradeResult.Status),
+		AvgWallTime:     gradeResult.AvgWallTime,
+		AvgMemory:       gradeResult.AvgMemory,
 		TestCaseResults: testCaseResults,
 	}, nil
 

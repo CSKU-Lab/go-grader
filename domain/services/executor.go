@@ -57,7 +57,7 @@ type Executor interface {
 	SetTestCases(testCases []models.TestCase)
 	SetCompareID(ID string)
 	Run() (*models.RunResult, error)
-	Grade() (*models.GradedResult, error)
+	Grade() (*models.GradeResult, error)
 }
 
 func (r *executorService) NewExecutor() Executor {
@@ -219,7 +219,7 @@ func (r *executor) Run() (*models.RunResult, error) {
 	return runResult, nil
 }
 
-func (r *executor) Grade() (*models.GradedResult, error) {
+func (r *executor) Grade() (*models.GradeResult, error) {
 	if r.lang.NeedCompile {
 		result, err := r.compile()
 		if err != nil {
@@ -228,7 +228,7 @@ func (r *executor) Grade() (*models.GradedResult, error) {
 
 		// this mean compilation failed
 		if result != nil {
-			return &models.GradedResult{
+			return &models.GradeResult{
 				Status: result.Status,
 			}, nil
 		}
@@ -259,7 +259,7 @@ func (r *executor) Grade() (*models.GradedResult, error) {
 		testCaseResult.Memory = result.Metadata.Memory
 
 		totalWallTime += result.Metadata.WallTime
-		totalMemory = result.Metadata.Memory
+		totalMemory += result.Metadata.Memory
 
 		isFailed := false
 
@@ -314,7 +314,7 @@ func (r *executor) Grade() (*models.GradedResult, error) {
 
 		r.hasInput = false
 	}
-	return &models.GradedResult{
+	return &models.GradeResult{
 		Status:          gradedStatus,
 		TestCaseResults: testCaseResults,
 		AvgWallTime:     totalWallTime / float32(len(r.testcases)),

@@ -12,7 +12,7 @@ type TestCaseResult struct {
 	StdErr   string
 }
 
-type GradedResult struct {
+type GradeResult struct {
 	ID              string
 	Status          execution.Status
 	TestCaseResults []TestCaseResult
@@ -20,7 +20,7 @@ type GradedResult struct {
 	AvgMemory       int32
 }
 
-type StoredGradedResult struct {
+type StoredGradeResult struct {
 	ID              string
 	Status          execution.Status
 	TestCaseResults []StoredTestCaseResult

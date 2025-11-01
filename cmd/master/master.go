@@ -42,6 +42,23 @@ func storeRunResult(ctx context.Context, logger *zap.SugaredLogger, service serv
 	}
 }
 
+func storeGradeResult(ctx context.Context, logger *zap.SugaredLogger, service services.ResultService, q messaging.Queue) {
+	err := q.Consume(ctx, "grade_results", func(msg []byte) {
+		result := &models.GradeResult{}
+		err := json.Unmarshal(msg, result)
+		if err != nil {
+			logger.Errorln("Cannot unmarshal run result message", "error", err)
+		}
+		err = service.CreateGradeResult(ctx, result.ID, result)
+		if err != nil {
+			logger.Errorln("Cannot store run result to the database", "error", err)
+		}
+	})
+	if err != nil {
+		logger.Fatalw("Cannot consume run result messages", "error", err)
+	}
+}
+
 func seedQueue(logger *zap.SugaredLogger, q messaging.Queue) {
 	err := q.Declare("grade")
 	if err != nil {
@@ -90,6 +107,7 @@ func main() {
 	resultService := services.NewResultService(resultRepo)
 
 	go storeRunResult(context.Background(), logger, resultService, rb)
+	go storeGradeResult(context.Background(), logger, resultService, rb)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", env.GetPort()))
 	if err != nil {
@@ -219,8 +237,8 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 	}, nil
 }
 
-func (s *graderGRPCServer) GetGradeResult(ctx context.Context, req *pb.GetGradedResultRequest) (*pb.GradedResultResponse, error) {
-	result, err := s.service.GetGradedResultByID(ctx, req.GetExecutionId())
+func (s *graderGRPCServer) GetGradeResult(ctx context.Context, req *pb.GetGradeResultRequest) (*pb.GradeResultResponse, error) {
+	result, err := s.service.GetGradeResultByID(ctx, req.GetExecutionId())
 	if err != nil {
 		return nil, err
 	}
@@ -237,11 +255,12 @@ func (s *graderGRPCServer) GetGradeResult(ctx context.Context, req *pb.GetGraded
 		}
 	}
 
-	return &pb.GradedResultResponse{
-		ExecutionId: result.ID,
-		Status:      executionStatusToProtoStatus(result.Status),
-		AvgWallTime: result.AvgWallTime,
-		AvgMemory:   result.AvgMemory,
+	return &pb.GradeResultResponse{
+		ExecutionId:     result.ID,
+		Status:          executionStatusToProtoStatus(result.Status),
+		AvgWallTime:     result.AvgWallTime,
+		AvgMemory:       result.AvgMemory,
+		TestCaseResults: testCaseResults,
 	}, nil
 }
 

@@ -159,7 +159,7 @@ func main() {
 			logger.Fatalw("Error from runner", "error", err)
 		}
 
-		logger.Infow("Grading finished", result)
+		logger.Infow("Grading finished", "result", result)
 
 		result.ID = execution.ID
 

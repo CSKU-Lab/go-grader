@@ -19,10 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GraderService_Run_FullMethodName             = "/grader.v1.GraderService/Run"
-	GraderService_GetRunResult_FullMethodName    = "/grader.v1.GraderService/GetRunResult"
-	GraderService_Grade_FullMethodName           = "/grader.v1.GraderService/Grade"
-	GraderService_GetGradedResult_FullMethodName = "/grader.v1.GraderService/GetGradedResult"
+	GraderService_Run_FullMethodName            = "/grader.v1.GraderService/Run"
+	GraderService_GetRunResult_FullMethodName   = "/grader.v1.GraderService/GetRunResult"
+	GraderService_Grade_FullMethodName          = "/grader.v1.GraderService/Grade"
+	GraderService_GetGradeResult_FullMethodName = "/grader.v1.GraderService/GetGradeResult"
 )
 
 // GraderServiceClient is the client API for GraderService service.
@@ -32,7 +32,7 @@ type GraderServiceClient interface {
 	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (*RunResponse, error)
 	GetRunResult(ctx context.Context, in *GetRunResultRequest, opts ...grpc.CallOption) (*RunResultResponse, error)
 	Grade(ctx context.Context, in *GradeRequest, opts ...grpc.CallOption) (*GradedResponse, error)
-	GetGradedResult(ctx context.Context, in *GetGradedResultRequest, opts ...grpc.CallOption) (*GradedResultResponse, error)
+	GetGradeResult(ctx context.Context, in *GetGradeResultRequest, opts ...grpc.CallOption) (*GradeResultResponse, error)
 }
 
 type graderServiceClient struct {
@@ -73,10 +73,10 @@ func (c *graderServiceClient) Grade(ctx context.Context, in *GradeRequest, opts 
 	return out, nil
 }
 
-func (c *graderServiceClient) GetGradedResult(ctx context.Context, in *GetGradedResultRequest, opts ...grpc.CallOption) (*GradedResultResponse, error) {
+func (c *graderServiceClient) GetGradeResult(ctx context.Context, in *GetGradeResultRequest, opts ...grpc.CallOption) (*GradeResultResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GradedResultResponse)
-	err := c.cc.Invoke(ctx, GraderService_GetGradedResult_FullMethodName, in, out, cOpts...)
+	out := new(GradeResultResponse)
+	err := c.cc.Invoke(ctx, GraderService_GetGradeResult_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ type GraderServiceServer interface {
 	Run(context.Context, *RunRequest) (*RunResponse, error)
 	GetRunResult(context.Context, *GetRunResultRequest) (*RunResultResponse, error)
 	Grade(context.Context, *GradeRequest) (*GradedResponse, error)
-	GetGradedResult(context.Context, *GetGradedResultRequest) (*GradedResultResponse, error)
+	GetGradeResult(context.Context, *GetGradeResultRequest) (*GradeResultResponse, error)
 	mustEmbedUnimplementedGraderServiceServer()
 }
 
@@ -110,8 +110,8 @@ func (UnimplementedGraderServiceServer) GetRunResult(context.Context, *GetRunRes
 func (UnimplementedGraderServiceServer) Grade(context.Context, *GradeRequest) (*GradedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Grade not implemented")
 }
-func (UnimplementedGraderServiceServer) GetGradedResult(context.Context, *GetGradedResultRequest) (*GradedResultResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetGradedResult not implemented")
+func (UnimplementedGraderServiceServer) GetGradeResult(context.Context, *GetGradeResultRequest) (*GradeResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetGradeResult not implemented")
 }
 func (UnimplementedGraderServiceServer) mustEmbedUnimplementedGraderServiceServer() {}
 func (UnimplementedGraderServiceServer) testEmbeddedByValue()                       {}
@@ -188,20 +188,20 @@ func _GraderService_Grade_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GraderService_GetGradedResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetGradedResultRequest)
+func _GraderService_GetGradeResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGradeResultRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GraderServiceServer).GetGradedResult(ctx, in)
+		return srv.(GraderServiceServer).GetGradeResult(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GraderService_GetGradedResult_FullMethodName,
+		FullMethod: GraderService_GetGradeResult_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GraderServiceServer).GetGradedResult(ctx, req.(*GetGradedResultRequest))
+		return srv.(GraderServiceServer).GetGradeResult(ctx, req.(*GetGradeResultRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -226,8 +226,8 @@ var GraderService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GraderService_Grade_Handler,
 		},
 		{
-			MethodName: "GetGradedResult",
-			Handler:    _GraderService_GetGradedResult_Handler,
+			MethodName: "GetGradeResult",
+			Handler:    _GraderService_GetGradeResult_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
