@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 )
 
 func main() {
 	ctx := context.Background()
+	env := configs.NewEnv()
 
-	rb, err := queue.NewRabbitMQ()
+	rb, err := queue.NewRabbitMQ(env.GetQueueServerURL())
 	if err != nil {
 		log.Fatalln("Cannot initialize RabbitMQ")
 	}

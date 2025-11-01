@@ -16,8 +16,8 @@ type rabbitmq struct {
 	confirms chan amqp.Confirmation
 }
 
-func NewRabbitMQ() (messaging.Queue, error) {
-	conn, err := amqp.Dial("amqp://admin:password@localhost:5672")
+func NewRabbitMQ(connStr string) (messaging.Queue, error) {
+	conn, err := amqp.Dial(connStr)
 	if err != nil {
 		return nil, err
 	}

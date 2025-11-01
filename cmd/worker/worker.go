@@ -16,6 +16,7 @@ import (
 	taskPB "github.com/CSKU-Lab/go-grader/genproto/task/v1"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/setup"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -23,6 +24,13 @@ import (
 
 func main() {
 	env := configs.NewEnv()
+
+	logger, err := zap.NewProduction()
+	if err != nil {
+		log.Fatalln("Cannot initialize zap logger")
+	}
+	sugar := logger.Sugar()
+	defer sugar.Sync()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -34,7 +42,7 @@ func main() {
 
 	runnerRes, err := configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
 	if err != nil {
-		log.Fatalln("Cannot get languages from gRPC server : ", err)
+		sugar.Fatalln("Cannot get runners from gRPC server : ", err)
 	}
 
 	compareRes, err := configGRPC.GetCompares(ctx, &emptypb.Empty{})
@@ -47,7 +55,7 @@ func main() {
 
 	setup.Init(runners, compares)
 
-	q, err := queue.NewRabbitMQ()
+	q, err := queue.NewRabbitMQ(env.GetQueueServerURL())
 	if err != nil {
 		log.Fatalln("Cannot initialize RabbitMQ")
 	}

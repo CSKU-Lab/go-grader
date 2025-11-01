@@ -10,6 +10,7 @@ import (
 type env struct {
 	configServerURL string
 	taskServerURL   string
+	rbmqServerURL   string
 }
 
 func NewEnv() *env {
@@ -29,6 +30,7 @@ func NewEnv() *env {
 	return &env{
 		configServerURL: os.Getenv("CONFIG_SERVER_URL"),
 		taskServerURL:   os.Getenv("TASK_SERVER_URL"),
+		rbmqServerURL:   os.Getenv("RBMQ_SERVER_URL"),
 	}
 }
 
@@ -44,4 +46,11 @@ func (m *env) GetTaskServerURL() string {
 		log.Fatalln("You forget to set the TASK_SERVER_URL environment variable!")
 	}
 	return m.taskServerURL
+}
+
+func (m *env) GetQueueServerURL() string {
+	if m.rbmqServerURL == "" {
+		log.Fatalln("You forget to set the QUEUE_SERVER_URL environment variable!")
+	}
+	return m.rbmqServerURL
 }
