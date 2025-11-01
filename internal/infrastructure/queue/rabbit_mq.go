@@ -3,20 +3,21 @@ package queue
 import (
 	"context"
 	"errors"
-	"log"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.uber.org/zap"
 )
 
 type rabbitmq struct {
 	conn     *amqp.Connection
 	ch       *amqp.Channel
 	confirms chan amqp.Confirmation
+	logger   *zap.SugaredLogger
 }
 
-func NewRabbitMQ(connStr string) (messaging.Queue, error) {
+func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, error) {
 	conn, err := amqp.Dial(connStr)
 	if err != nil {
 		return nil, err
@@ -38,6 +39,7 @@ func NewRabbitMQ(connStr string) (messaging.Queue, error) {
 		conn:     conn,
 		ch:       ch,
 		confirms: confirms,
+		logger:   logger,
 	}, nil
 }
 
@@ -112,7 +114,11 @@ func (r *rabbitmq) Consume(ctx context.Context, queue string, handler func(messa
 		go func() {
 			handler(msg.Body)
 			msg.Ack(false)
-			log.Printf("Message %s consumed", msg.MessageId)
+			if msg.MessageId != "" {
+				r.logger.Infof("Message %s consumed", msg.MessageId)
+			} else {
+				r.logger.Info("Message consumed")
+			}
 		}()
 	}
 

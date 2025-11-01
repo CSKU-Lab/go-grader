@@ -3,33 +3,35 @@ package services
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"os"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/models"
+	"go.uber.org/zap"
 )
 
 type CompareService struct {
 	compares []models.LocalCompare
+	logger   *zap.SugaredLogger
 }
 
-func NewCompareService() *CompareService {
+func NewCompareService(logger *zap.SugaredLogger) *CompareService {
 	return &CompareService{
-		compares: getCompares(),
+		compares: getCompares(logger),
+		logger:   logger,
 	}
 }
 
-func getCompares() []models.LocalCompare {
+func getCompares(logger *zap.SugaredLogger) []models.LocalCompare {
 	data, err := os.ReadFile(constants.COMPARE_LIST_PATH)
 	if err != nil {
-		log.Fatalf("Cannot read compares.json: %s", err)
+		logger.Fatalf("Cannot read compares.json: %s", err)
 	}
 
 	var l models.LocalCompareList
 	err = json.Unmarshal(data, &l)
 	if err != nil {
-		log.Fatalln("Cannot unmarshal compares.json: ", err)
+		logger.Fatalw("Cannot unmarshal compares.json", "error", err)
 	}
 
 	return l.Compares

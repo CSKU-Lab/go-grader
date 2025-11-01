@@ -4,27 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"reflect"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/models"
+	"go.uber.org/zap"
 )
 
 type IsolateService struct {
 	ctx    context.Context
 	boxIds chan int
+	logger *zap.SugaredLogger
 }
 
-func NewIsolateService(ctx context.Context) *IsolateService {
+func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger) *IsolateService {
 	boxIds := make(chan int, constants.MAX_QUEUES)
 	for i := range constants.MAX_QUEUES {
 		boxIds <- i
 	}
 
-	return &IsolateService{ctx: ctx, boxIds: boxIds}
+	return &IsolateService{ctx: ctx, boxIds: boxIds, logger: logger}
 }
 
 type IsolateInstance struct {
@@ -33,6 +34,7 @@ type IsolateInstance struct {
 	boxPath      string
 	metadataPath string
 	boxIds       chan int
+	logger       *zap.SugaredLogger
 }
 
 func (s *IsolateService) NewInstance() *IsolateInstance {
@@ -45,6 +47,7 @@ func (s *IsolateService) NewInstance() *IsolateInstance {
 		boxPath:      fmt.Sprintf(constants.BOX_PATH, boxID),
 		metadataPath: metadataPath,
 		boxIds:       s.boxIds,
+		logger:       s.logger,
 	}
 
 	instance.init()
@@ -53,11 +56,11 @@ func (s *IsolateService) NewInstance() *IsolateInstance {
 }
 
 func (i *IsolateInstance) log(format string, args ...any) {
-	log.Printf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
+	i.logger.Infof("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
 func (i *IsolateInstance) logFatalf(format string, args ...any) {
-	log.Fatalf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
+	i.logger.Fatalf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
 func (s *IsolateInstance) execute(args ...string) error {

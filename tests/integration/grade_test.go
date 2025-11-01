@@ -6,15 +6,14 @@ import (
 
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
-	"github.com/CSKU-Lab/go-grader/internal/setup"
 	"github.com/CSKU-Lab/go-grader/tests/testdatas"
 )
 
 func TestGradeCompileError(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	err := runner.SetRunner("cpp_test")
 	if err != nil {
@@ -55,10 +54,10 @@ func TestGradeCompileError(t *testing.T) {
 }
 
 func TestGradePassed(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	err := runner.SetRunner("cpp_test")
 	if err != nil {
@@ -99,10 +98,10 @@ func TestGradePassed(t *testing.T) {
 }
 
 func TestGradeFailed(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	err := runner.SetRunner("cpp_test")
 	if err != nil {
@@ -147,8 +146,8 @@ func TestGradeFailed(t *testing.T) {
 }
 
 func TestGradeMultipleRunners(t *testing.T) {
-	runnerService := initTest()
-	defer setup.Cleanup()
+	runnerService, cleanup := initTest(t)
+	defer cleanup()
 
 	var wg sync.WaitGroup
 	errChan := make(chan error)
@@ -194,10 +193,10 @@ func TestGradeMultipleRunners(t *testing.T) {
 }
 
 func TestGradeWithLimits(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	err := runner.SetRunner("python_test")
 	if err != nil {

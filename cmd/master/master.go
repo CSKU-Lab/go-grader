@@ -3,20 +3,31 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"os"
 
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
+	"github.com/CSKU-Lab/go-grader/internal/logging"
 )
 
 func main() {
-	ctx := context.Background()
-	env := configs.NewEnv()
-
-	rb, err := queue.NewRabbitMQ(env.GetQueueServerURL())
+	logger, loggerCleanup, err := logging.New(os.Getenv("ENV"))
 	if err != nil {
-		log.Fatalln("Cannot initialize RabbitMQ")
+		panic(err)
+	}
+	defer func() {
+		if err := loggerCleanup(); err != nil {
+			logger.Warnw("failed to flush logger", "error", err)
+		}
+	}()
+
+	ctx := context.Background()
+	env := configs.NewEnv(logger)
+
+	rb, err := queue.NewRabbitMQ(logger, env.GetQueueServerURL())
+	if err != nil {
+		logger.Fatalw("Cannot initialize RabbitMQ", "error", err)
 	}
 	defer rb.Close()
 
@@ -33,15 +44,15 @@ func main() {
 
 	message, err := json.Marshal(&execution)
 	if err != nil {
-		log.Fatalln("Cannot parse execution struct to json")
+		logger.Fatalw("Cannot parse execution struct to json", "error", err)
 	}
 
 	for range 1 {
 		err = rb.Publish(ctx, "grading", message)
 		if err != nil {
-			log.Fatalln("Cannot publish message to the execution queue")
+			logger.Fatalw("Cannot publish message to the execution queue", "error", err)
 		}
 
-		log.Println("Publish message to the queue successfully!")
+		logger.Info("Publish message to the queue successfully!")
 	}
 }

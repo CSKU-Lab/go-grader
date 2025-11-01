@@ -3,7 +3,6 @@ package setup
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -13,47 +12,48 @@ import (
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
 	"github.com/CSKU-Lab/go-grader/internal/file"
+	"go.uber.org/zap"
 )
 
-func Init(runners []models.RunnerConfig, compares []models.CompareConfig) {
+func Init(logger *zap.SugaredLogger, runners []models.RunnerConfig, compares []models.CompareConfig) {
 	var wg sync.WaitGroup
 
-	setupConfigDir()
+	setupConfigDir(logger)
 	wg.Add(2)
-	go setupRunners(&wg, runners)
-	go setupCompares(&wg, compares)
+	go setupRunners(logger, &wg, runners)
+	go setupCompares(logger, &wg, compares)
 	wg.Wait()
 
-	log.Println("Setup completed. :D")
+	logger.Info("Setup completed. :D")
 }
 
-func Cleanup() {
+func Cleanup(logger *zap.SugaredLogger) {
 	err := os.RemoveAll(constants.CONFIG_DIR)
 	if err != nil {
-		log.Fatalln("Cannot remove config directory : ", err)
+		logger.Fatalw("Cannot remove config directory", "error", err)
 	}
 }
 
-func setupConfigDir() {
+func setupConfigDir(logger *zap.SugaredLogger) {
 	err := os.MkdirAll(constants.CONFIG_DIR, 0755)
 	if err != nil {
-		log.Fatalln("Cannot create config directory : ", err)
+		logger.Fatalw("Cannot create config directory", "error", err)
 	}
 
 	err = os.Mkdir(constants.RUNNER_DIR, 0755)
 	if err != nil {
-		log.Fatalln("Cannot create runners directory")
+		logger.Fatal("Cannot create runners directory")
 	}
 
 	err = os.Mkdir(constants.COMPARE_DIR, 0755)
 	if err != nil {
-		log.Fatalln("Cannot create compares directory")
+		logger.Fatal("Cannot create compares directory")
 	}
 
-	log.Println("Config directory is created.")
+	logger.Info("Config directory is created.")
 }
 
-func setupRunners(wg *sync.WaitGroup, runners []models.RunnerConfig) {
+func setupRunners(logger *zap.SugaredLogger, wg *sync.WaitGroup, runners []models.RunnerConfig) {
 	defer wg.Done()
 
 	for _, runner := range runners {
@@ -63,14 +63,14 @@ func setupRunners(wg *sync.WaitGroup, runners []models.RunnerConfig) {
 			runnerDir := path.Join(constants.RUNNER_DIR, runner.ID)
 			err := os.Mkdir(runnerDir, 0755)
 			if err != nil {
-				log.Fatalf("[setupRunners] : Cannot create %s config directory : %s", runner.ID, err)
+				logger.Fatalf("[setupRunners] : Cannot create %s config directory : %s", runner.ID, err)
 			}
 
 			if runner.BuildScript != "" {
 				buildPath := path.Join(runnerDir, "build_script.sh")
 				err := os.WriteFile(buildPath, []byte(runner.BuildScript), 0755)
 				if err != nil {
-					log.Fatalf("Cannot write %s build_script.sh : %s", runner.ID, err)
+					logger.Fatalf("Cannot write %s build_script.sh : %s", runner.ID, err)
 				}
 			}
 
@@ -78,18 +78,18 @@ func setupRunners(wg *sync.WaitGroup, runners []models.RunnerConfig) {
 				runPath := path.Join(runnerDir, "run_script.sh")
 				err := os.WriteFile(runPath, []byte(runner.RunScript), 0655)
 				if err != nil {
-					log.Fatalf("Cannot write %s run_script.sh : %s", runner.ID, err)
+					logger.Fatalf("Cannot write %s run_script.sh : %s", runner.ID, err)
 				}
 			}
-			log.Printf("%s setup completed ✅", runner.ID)
+			logger.Infof("%s setup completed ✅", runner.ID)
 		}()
 	}
 }
 
-func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
+func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []models.CompareConfig) {
 	defer wg.Done()
 
-	isolateService := services.NewIsolateService(context.Background())
+	isolateService := services.NewIsolateService(context.Background(), logger)
 	for _, compare := range compares {
 		wg.Add(1)
 		go func() {
@@ -99,7 +99,7 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 			comparePath := path.Join(constants.COMPARE_DIR, compare.ID)
 			err := os.Mkdir(comparePath, 0755)
 			if err != nil {
-				log.Fatalln("Cannot create compare directory : ", err)
+				logger.Fatalw("Cannot create compare directory", "error", err)
 			}
 
 			scriptPath := path.Join(comparePath, compare.RunName)
@@ -107,19 +107,19 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 			if compare.BuildScript != "" {
 				exePath, err := buildCompareScript(runner, &compare)
 				if err != nil {
-					log.Fatalf("Cannot build compare script for %s : %s", compare.ID, err)
+					logger.Fatalf("Cannot build compare script for %s : %s", compare.ID, err)
 				}
 
 				err = file.MoveFile(exePath, scriptPath)
 				if err != nil {
-					log.Fatalf("Cannot move compare script %s : %s", compare.ID, err)
+					logger.Fatalf("Cannot move compare script %s : %s", compare.ID, err)
 				}
 			} else {
 				for _, file := range compare.Files {
 					replacedContent := replaceEnv(file.Content, scriptPath)
 					err := os.WriteFile(path.Join(comparePath, file.Name), []byte(replacedContent), 0655)
 					if err != nil {
-						log.Fatalf("Cannot write %s file %s : %s", compare.ID, file.Name, err)
+						logger.Fatalf("Cannot write %s file %s : %s", compare.ID, file.Name, err)
 					}
 				}
 			}
@@ -127,12 +127,12 @@ func setupCompares(wg *sync.WaitGroup, compares []models.CompareConfig) {
 			runScriptPath := path.Join(comparePath, "run_script.sh")
 			err = createRunScript(runScriptPath, scriptPath, compare.RunScript)
 			if err != nil {
-				log.Fatalf("Cannot create run_script.sh of %s : %s", compare.ID, err)
+				logger.Fatalf("Cannot create run_script.sh of %s : %s", compare.ID, err)
 			}
 			runner.Cleanup()
-			log.Printf("Write %s to compares.json", compare.ID)
+			logger.Infof("Write %s to compares.json", compare.ID)
 
-			log.Printf("%s setup completed ✅", compare.ID)
+			logger.Infof("%s setup completed ✅", compare.ID)
 		}()
 	}
 

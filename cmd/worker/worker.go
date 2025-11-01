@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +14,7 @@ import (
 	configPB "github.com/CSKU-Lab/go-grader/genproto/config/v1"
 	taskPB "github.com/CSKU-Lab/go-grader/genproto/task/v1"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
+	"github.com/CSKU-Lab/go-grader/internal/logging"
 	"github.com/CSKU-Lab/go-grader/internal/setup"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -23,50 +23,53 @@ import (
 )
 
 func main() {
-	env := configs.NewEnv()
-
-	logger, err := zap.NewProduction()
+	logger, loggerCleanup, err := logging.New(os.Getenv("ENV"))
 	if err != nil {
-		log.Fatalln("Cannot initialize zap logger")
+		panic(err)
 	}
-	sugar := logger.Sugar()
-	defer sugar.Sync()
+	defer func() {
+		if err := loggerCleanup(); err != nil {
+			logger.Warnw("failed to flush logger", "error", err)
+		}
+	}()
+
+	env := configs.NewEnv(logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	configGRPC, closeConfig := initConfigServerClient(env.GetConfigServerURL())
+	configGRPC, closeConfig := initConfigServerClient(logger, env.GetConfigServerURL())
 	defer closeConfig()
 
-	taskGRPC, closeTask := initTaskServerClient(env.GetTaskServerURL())
+	taskGRPC, closeTask := initTaskServerClient(logger, env.GetTaskServerURL())
 	defer closeTask()
 
 	runnerRes, err := configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
 	if err != nil {
-		sugar.Fatalln("Cannot get runners from gRPC server : ", err)
+		logger.Fatalw("Cannot get runners from gRPC server", "error", err)
 	}
 
 	compareRes, err := configGRPC.GetCompares(ctx, &emptypb.Empty{})
 	if err != nil {
-		log.Fatalln("Cannot get compares from gRPC server : ", err)
+		logger.Fatalw("Cannot get compares from gRPC server", "error", err)
 	}
 
 	runners := runnerPbToModel(runnerRes.Runners)
 	compares := comparePbToModel(compareRes.Compares)
 
-	setup.Init(runners, compares)
+	setup.Init(logger, runners, compares)
 
-	q, err := queue.NewRabbitMQ(env.GetQueueServerURL())
+	q, err := queue.NewRabbitMQ(logger, env.GetQueueServerURL())
 	if err != nil {
-		log.Fatalln("Cannot initialize RabbitMQ")
+		logger.Fatalw("Cannot initialize RabbitMQ", "error", err)
 	}
 
-	runnerService := services.NewRunnerService()
-	compareService := services.NewCompareService()
+	runnerService := services.NewRunnerService(logger)
+	compareService := services.NewCompareService(logger)
 
-	isolateService := services.NewIsolateService(ctx)
-	executorService := services.NewExecutorService(isolateService, runnerService, compareService)
+	isolateService := services.NewIsolateService(ctx, logger)
+	executorService := services.NewExecutorService(logger, isolateService, runnerService, compareService)
 
-	log.Println("Worker is ready to start working 🤖...")
+	logger.Info("Worker is ready to start working 🤖...")
 
 	go func() {
 		err := q.Consume(ctx, "running", func(message []byte) {
@@ -74,24 +77,28 @@ func main() {
 
 			err := json.Unmarshal(message, execution)
 			if err != nil {
-				log.Fatalln("Cannot unmarshal message")
+				logger.Fatalw("Cannot unmarshal message", "error", err)
 			}
 
 			executor := executorService.NewExecutor()
 			defer executor.Cleanup()
 
-			executor.SetRunner(execution.RunnerID)
-			executor.SetFiles(execution.Files)
+			if err := executor.SetRunner(execution.RunnerID); err != nil {
+				logger.Fatalw("Cannot set runner", "error", err)
+			}
+			if err := executor.SetFiles(execution.Files); err != nil {
+				logger.Fatalw("Cannot set files", "error", err)
+			}
 
 			result, err := executor.Run()
 			if err != nil {
-				log.Fatalln("Error from runner ", err)
+				logger.Fatalw("Error from runner", "error", err)
 			}
 
-			log.Println(result)
+			logger.Infow("Runner finished", "result", result)
 		})
 		if err != nil {
-			log.Fatalln("Cannot consume message from the queue: ", err)
+			logger.Fatalw("Cannot consume message from the queue", "error", err)
 		}
 	}()
 
@@ -100,19 +107,23 @@ func main() {
 
 		err := json.Unmarshal(message, execution)
 		if err != nil {
-			log.Fatalln("Cannot unmarshal message")
+			logger.Fatalw("Cannot unmarshal message", "error", err)
 		}
 
 		task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{
 			Id: execution.TaskID,
 		})
 		if err != nil {
-			log.Fatalln("Cannot get task from gRPC server: ", err)
+			logger.Fatalw("Cannot get task from gRPC server", "error", err)
 		}
 
 		executor := executorService.NewExecutor()
-		executor.SetRunner(execution.RunnerID)
-		executor.SetFiles(execution.Files)
+		if err := executor.SetRunner(execution.RunnerID); err != nil {
+			logger.Fatalw("Cannot set runner", "error", err)
+		}
+		if err := executor.SetFiles(execution.Files); err != nil {
+			logger.Fatalw("Cannot set files", "error", err)
+		}
 		executor.SetCompareID(task.CompareId)
 		executor.SetTestCases(func() []models.TestCase {
 			var testCases []models.TestCase
@@ -128,34 +139,34 @@ func main() {
 
 		result, err := executor.Grade()
 		if err != nil {
-			log.Fatalln("Error from runner ", err)
+			logger.Fatalw("Error from runner", "error", err)
 		}
 
-		log.Println(result)
+		logger.Infow("Grading finished", "result", result)
 	})
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	sig := <-sigs
-	log.Printf("Receive %s signal from OS, going to shutdown...\n", sig)
+	logger.Infof("Receive %s signal from OS, going to shutdown...", sig)
 	timer := time.AfterFunc(10*time.Second, func() {
-		log.Println("Server couldn't stop grafully in time. Doing force stop.")
+		logger.Warn("Server couldn't stop grafully in time. Doing force stop.")
 	})
 	defer timer.Stop()
 	cancel()
 
 	q.Close()
-	log.Println("RabbitMQ connection is closed.")
+	logger.Info("RabbitMQ connection is closed.")
 	closeConfig()
-	log.Println("gRPC connection is closed.")
-	log.Println("Successfully gracefully shutdown the server :D")
+	logger.Info("gRPC connection is closed.")
+	logger.Info("Successfully gracefully shutdown the server :D")
 }
 
-func initConfigServerClient(clientAddr string) (client configPB.ConfigServiceClient, close func()) {
+func initConfigServerClient(logger *zap.SugaredLogger, clientAddr string) (client configPB.ConfigServiceClient, close func()) {
 	conn, err := grpc.NewClient(clientAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect to gRPC server: %v", err)
+		logger.Fatalf("Failed to connect to gRPC server: %v", err)
 	}
 
 	c := configPB.NewConfigServiceClient(conn)
@@ -165,10 +176,10 @@ func initConfigServerClient(clientAddr string) (client configPB.ConfigServiceCli
 	}
 }
 
-func initTaskServerClient(clientAddr string) (client taskPB.TaskServiceClient, close func()) {
+func initTaskServerClient(logger *zap.SugaredLogger, clientAddr string) (client taskPB.TaskServiceClient, close func()) {
 	conn, err := grpc.NewClient(clientAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect to gRPC server: %v", err)
+		logger.Fatalf("Failed to connect to gRPC server: %v", err)
 	}
 
 	c := taskPB.NewTaskServiceClient(conn)

@@ -3,28 +3,30 @@ package services
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os/exec"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
+	"go.uber.org/zap"
 )
 
 type executorService struct {
 	isolateService *IsolateService
 	runnerService  *RunnerService
 	compareService *CompareService
+	logger         *zap.SugaredLogger
 }
 
 type ExecutorService interface {
 	NewExecutor() Executor
 }
 
-func NewExecutorService(isolateService *IsolateService, runnerService *RunnerService, compareService *CompareService) ExecutorService {
+func NewExecutorService(logger *zap.SugaredLogger, isolateService *IsolateService, runnerService *RunnerService, compareService *CompareService) ExecutorService {
 	return &executorService{
 		isolateService: isolateService,
 		runnerService:  runnerService,
 		compareService: compareService,
+		logger:         logger,
 	}
 }
 
@@ -43,6 +45,7 @@ type executor struct {
 	limits         *models.Limit
 	hasInput       bool
 	testcases      []models.TestCase
+	logger         *zap.SugaredLogger
 }
 
 type Executor interface {
@@ -62,6 +65,7 @@ func (r *executorService) NewExecutor() Executor {
 		instance:       r.isolateService.NewInstance(),
 		runnerService:  r.runnerService,
 		compareService: r.compareService,
+		logger:         r.logger,
 	}
 }
 
@@ -149,7 +153,7 @@ func (r *executor) SetLimits(limits *models.Limit) {
 
 func (r *executor) SetTestCases(testCases []models.TestCase) {
 	if r.comparePath == "" {
-		log.Fatalln("You need to set compare ID before setting test cases")
+		r.logger.Fatal("You need to set compare ID before setting test cases")
 	}
 	r.testcases = testCases
 }
@@ -157,7 +161,7 @@ func (r *executor) SetTestCases(testCases []models.TestCase) {
 func (r *executor) SetCompareID(ID string) {
 	compare, err := r.compareService.GetByID(ID)
 	if err != nil {
-		log.Fatalln("Cannot get compare: ", err)
+		r.logger.Fatalw("Cannot get compare", "error", err)
 	}
 
 	r.comparePath = compare.Path

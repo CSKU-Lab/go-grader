@@ -1,19 +1,17 @@
 package integration
 
 import (
-	"log"
 	"testing"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
-	"github.com/CSKU-Lab/go-grader/internal/setup"
 )
 
 func TestRunPassed(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	runner.SetRunner("python_test")
 	runner.SetFiles([]models.File{
@@ -27,14 +25,14 @@ func TestRunPassed(t *testing.T) {
 		t.Fatalf("Cannot run: %s", err)
 	}
 
-	log.Println(result)
+	t.Log(result)
 }
 
 func TestRunWithInput(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	runner.SetRunner("python_test")
 	runner.SetFiles([]models.File{
@@ -59,10 +57,10 @@ func TestRunWithInput(t *testing.T) {
 }
 
 func TestRunCompileFailed(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	runner.SetRunner("cpp_test")
 	runner.SetFiles([]models.File{
@@ -86,10 +84,10 @@ func TestRunCompileFailed(t *testing.T) {
 }
 
 func TestRunFailed(t *testing.T) {
-	runnerService := initTest()
+	runnerService, cleanup := initTest(t)
 	runner := runnerService.NewExecutor()
 	defer runner.Cleanup()
-	defer setup.Cleanup()
+	defer cleanup()
 
 	runner.SetRunner("python_test")
 	runner.SetFiles([]models.File{

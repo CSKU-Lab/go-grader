@@ -2,26 +2,28 @@ package services
 
 import (
 	"errors"
-	"log"
 	"os"
 	"slices"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/models"
+	"go.uber.org/zap"
 )
 
 type RunnerService struct {
 	runners []models.LocalRunner
+	logger  *zap.SugaredLogger
 }
 
-func NewRunnerService() *RunnerService {
+func NewRunnerService(logger *zap.SugaredLogger) *RunnerService {
 	runners, err := getRunners()
 	if err != nil {
-		log.Fatalf("Cannot get runners: %s", err)
+		logger.Fatalf("Cannot get runners: %s", err)
 	}
 
 	return &RunnerService{
 		runners: runners,
+		logger:  logger,
 	}
 
 }

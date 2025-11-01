@@ -1,7 +1,7 @@
 package models
 
 import (
-	"log"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -55,7 +55,7 @@ func ParseMetadata(metadataStr string) (*Metadata, error) {
 			time := strings.TrimSpace(strings.TrimPrefix(line, "time:"))
 			time64, err := strconv.ParseFloat(time, 32)
 			if err != nil {
-				log.Fatal("Cannot parse Time : ", err)
+				return nil, fmt.Errorf("cannot parse time: %w", err)
 			}
 			metadata.Time = float32(time64)
 		}
@@ -63,7 +63,7 @@ func ParseMetadata(metadataStr string) (*Metadata, error) {
 			wallTime := strings.TrimSpace(strings.TrimPrefix(line, "time-wall:"))
 			wallTime64, err := strconv.ParseFloat(wallTime, 32)
 			if err != nil {
-				log.Fatal("Cannot parse Wall time : ", err)
+				return nil, fmt.Errorf("cannot parse wall time: %w", err)
 			}
 			metadata.WallTime = float32(wallTime64)
 
@@ -72,7 +72,7 @@ func ParseMetadata(metadataStr string) (*Metadata, error) {
 			memory := strings.TrimSpace(strings.TrimPrefix(line, "max-rss:"))
 			memoryInt, err := strconv.Atoi(memory)
 			if err != nil {
-				log.Fatal("Cannot parse Memory : ", err)
+				return nil, fmt.Errorf("cannot parse memory: %w", err)
 			}
 			metadata.Memory = int32(memoryInt)
 		}
