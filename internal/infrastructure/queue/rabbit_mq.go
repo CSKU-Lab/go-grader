@@ -43,8 +43,8 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 	}, nil
 }
 
-func (r *rabbitmq) declareQueue(queue string) (amqp.Queue, error) {
-	return r.ch.QueueDeclare(
+func (r *rabbitmq) Declare(queue string) error {
+	_, err := r.ch.QueueDeclare(
 		queue,
 		true,
 		false,
@@ -52,18 +52,15 @@ func (r *rabbitmq) declareQueue(queue string) (amqp.Queue, error) {
 		false,
 		nil,
 	)
+
+	return err
 }
 
 func (r *rabbitmq) Publish(ctx context.Context, queue string, message []byte) error {
-	q, err := r.declareQueue(queue)
-	if err != nil {
-		return err
-	}
-
-	err = r.ch.PublishWithContext(
+	err := r.ch.PublishWithContext(
 		ctx,
 		"",
-		q.Name,
+		queue,
 		false,
 		false,
 		amqp.Publishing{
@@ -86,19 +83,15 @@ func (r *rabbitmq) Publish(ctx context.Context, queue string, message []byte) er
 }
 
 func (r *rabbitmq) Consume(ctx context.Context, queue string, handler func(message []byte)) error {
-	q, err := r.declareQueue(queue)
-	if err != nil {
-		return err
-	}
 
-	err = r.ch.Qos(constants.MAX_QUEUES, 0, false)
+	err := r.ch.Qos(constants.MAX_QUEUES, 0, false)
 	if err != nil {
 		return err
 	}
 
 	msgs, err := r.ch.ConsumeWithContext(
 		ctx,
-		q.Name,
+		queue,
 		"",
 		false,
 		false,

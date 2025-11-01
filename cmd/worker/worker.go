@@ -72,7 +72,7 @@ func main() {
 	logger.Info("Worker is ready to start working 🤖...")
 
 	go func() {
-		err := q.Consume(ctx, "running", func(message []byte) {
+		err := q.Consume(ctx, "run", func(message []byte) {
 			execution := &models.Execution{}
 
 			err := json.Unmarshal(message, execution)
@@ -95,6 +95,18 @@ func main() {
 				logger.Fatalw("Error from runner", "error", err)
 			}
 
+			result.ID = execution.ID
+
+			j, err := json.Marshal(result)
+			if err != nil {
+				logger.Errorw("Cannot marshal run result", "error", err)
+			}
+
+			err = q.Publish(ctx, "run_results", j)
+			if err != nil {
+				logger.Errorw("Cannot publish run result to the queue", "error", err)
+			}
+
 			logger.Infow("Runner finished", "result", result)
 		})
 		if err != nil {
@@ -102,7 +114,7 @@ func main() {
 		}
 	}()
 
-	go q.Consume(ctx, "grading", func(message []byte) {
+	go q.Consume(ctx, "grade", func(message []byte) {
 		execution := &models.Execution{}
 
 		err := json.Unmarshal(message, execution)

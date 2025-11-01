@@ -13,6 +13,7 @@ type TestCaseResult struct {
 }
 
 type GradeResult struct {
+	ID              string
 	Status          execution.Status
 	Error           string
 	TestCaseResults []TestCaseResult

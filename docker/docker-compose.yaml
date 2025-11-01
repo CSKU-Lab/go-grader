@@ -12,6 +12,18 @@ services:
       - RABBITMQ_DEFAULT_USER=admin
       - RABBITMQ_DEFAULT_PASS=password
     restart: unless-stopped
+  db:
+    image: postgres:18
+    container_name: go-grader-db
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql
+    environment:
+      - POSTGRES_USER=go-grader
+      - POSTGRES_PASSWORD=go-grader-password
+      - POSTGRES_DB=results
 
 volumes:
   rabbitmq_data:
+  db_data:
