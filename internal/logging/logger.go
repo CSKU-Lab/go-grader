@@ -10,7 +10,7 @@ import (
 // New creates a zap logger configured for CLIs and services.
 func New(env string) (*zap.SugaredLogger, func() error, error) {
 	cfg := zap.NewProductionConfig()
-	if env == "local" || env == "development" || env == "dev" {
+	if env == "local" || env == "development" || env == "dev" || env == "docker" {
 		// enable human readable console logs during local development
 		cfg = zap.NewDevelopmentConfig()
 		cfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
