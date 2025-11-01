@@ -3,22 +3,29 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"os"
-	"sync"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/CSKU-Lab/go-grader/configs"
+	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
+	pb "github.com/CSKU-Lab/go-grader/genproto/grader/v1"
 	"github.com/CSKU-Lab/go-grader/internal/adapters/sqlx"
 	"github.com/CSKU-Lab/go-grader/internal/generators"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/logging"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
-func storeRunResult(ctx context.Context, logger *zap.SugaredLogger, wg *sync.WaitGroup, service services.ResultService, q messaging.Queue) {
-	defer wg.Done()
+func storeRunResult(ctx context.Context, logger *zap.SugaredLogger, service services.ResultService, q messaging.Queue) {
 	err := q.Consume(ctx, "run_results", func(msg []byte) {
 		result := &models.RunResult{}
 		err := json.Unmarshal(msg, result)
@@ -68,7 +75,6 @@ func main() {
 		}
 	}()
 
-	ctx := context.Background()
 	env := configs.NewEnv(logger)
 
 	rb, err := queue.NewRabbitMQ(logger, env.GetQueueServerURL())
@@ -83,37 +89,122 @@ func main() {
 	resultRepo := sqlx.NewSQLXInstance(db)
 	resultService := services.NewResultService(resultRepo)
 
+	go storeRunResult(context.Background(), logger, resultService, rb)
+
+	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", env.GetPort()))
+	if err != nil {
+		logger.Fatalln("failed to listen: ", err)
+	}
+
+	s := grpc.NewServer()
+	pb.RegisterGraderServiceServer(s, newGraderGRPCServer(logger, rb, resultService))
+
+	reflection.Register(s)
+	logger.Infoln("gRPC ConfigService registered")
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
-		for range 100 {
-			id := generators.UUID()
-			execution := models.Execution{
-				ID: id,
-				Files: []models.File{
-					{
-						Name:    "main.py",
-						Content: `print("This output is in Postgresql database")`,
-					},
-				},
-				RunnerID: "python_3_11_2",
-				TaskID:   "1",
-			}
-
-			message, err := json.Marshal(&execution)
-			if err != nil {
-				logger.Fatalw("Cannot parse execution struct to json", "error", err)
-			}
-
-			err = rb.Publish(ctx, "run", message)
-			if err != nil {
-				logger.Fatalw("Cannot publish message to the execution queue", "error", err)
-			}
-			logger.Info("Publish message to the queue successfully!")
-		}
+		sig := <-sigs
+		logger.Info("Receive %s signal from OS, going to shutdown...\n", sig)
+		timer := time.AfterFunc(10*time.Second, func() {
+			logger.Infoln("Server couldn't stop grafully in time. Doing force stop.")
+			s.Stop()
+		})
+		defer timer.Stop()
+		s.GracefulStop()
+		logger.Infoln("Successfully gracefully shutdown the server :D")
 	}()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go storeRunResult(context.Background(), logger, &wg, resultService, rb)
+	if err := s.Serve(lis); err != nil {
+		logger.Fatalln("Cannot start grpc server :", err)
+	}
+}
 
-	wg.Wait()
+type graderGRPCServer struct {
+	logger  *zap.SugaredLogger
+	q       messaging.Queue
+	service services.ResultService
+	pb.UnimplementedGraderServiceServer
+}
+
+func newGraderGRPCServer(logger *zap.SugaredLogger, q messaging.Queue, service services.ResultService) *graderGRPCServer {
+	return &graderGRPCServer{
+		logger:  logger,
+		q:       q,
+		service: service,
+	}
+}
+
+func (s *graderGRPCServer) Run(ctx context.Context, req *pb.RunRequest) (*pb.RunResponse, error) {
+	id := generators.UUID()
+
+	var files = make([]models.File, len(req.Files))
+	for i, file := range req.GetFiles() {
+		files[i] = models.File{
+			Name:    file.GetName(),
+			Content: file.GetContent(),
+		}
+	}
+
+	execution := models.RunExecution{
+		ID:       id,
+		Files:    files,
+		Input:    req.GetInput(),
+		RunnerID: req.GetRunnerId(),
+	}
+
+	message, err := json.Marshal(&execution)
+	if err != nil {
+		s.logger.Fatalw("Cannot parse execution struct to json", "error", err)
+	}
+
+	err = s.q.Publish(ctx, "run", message)
+	if err != nil {
+		s.logger.Fatalw("Cannot publish message to the execution queue", "error", err)
+	}
+	s.logger.Info("Publish message to the queue successfully!")
+
+	return &pb.RunResponse{
+		ExecutionId: id,
+	}, nil
+}
+
+func (s *graderGRPCServer) GetRunResult(ctx context.Context, req *pb.GetRunResultRequest) (*pb.RunResultResponse, error) {
+	result, err := s.service.GetRunResultByID(ctx, req.GetExecutionId())
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.RunResultResponse{
+		ExecutionId: result.ID,
+		Status:      executionStatusToProtoStatus(result.Status),
+		Output:      result.Output,
+		WallTime:    result.WallTime,
+		Memory:      result.Memory,
+	}, nil
+}
+
+func executionStatusToProtoStatus(status execution.Status) pb.ExecutionStatus {
+	switch status {
+	case execution.COMPILE_FAILED:
+		return pb.ExecutionStatus_STATUS_COMPILE_FAILED
+	case execution.RUN_PASSED:
+		return pb.ExecutionStatus_STATUS_RUN_PASSED
+	case execution.RUN_FAILED:
+		return pb.ExecutionStatus_STATUS_RUN_FAILED
+	case execution.TIME_LIMIT_EXCEEDED:
+		return pb.ExecutionStatus_STATUS_TIME_LIMIT_EXCEEDED
+	case execution.MEMORY_LIMIT_EXCEEDED:
+		return pb.ExecutionStatus_STATUS_MEMORY_LIMIT_EXCEEDED
+	case execution.RUNTIME_ERROR:
+		return pb.ExecutionStatus_STATUS_RUNTIME_ERROR
+	case execution.SIGNAL_ERROR:
+		return pb.ExecutionStatus_STATUS_SIGNAL_ERROR
+	case execution.GRADER_ERROR:
+		return pb.ExecutionStatus_STATUS_GRADER_ERROR
+	default:
+		return pb.ExecutionStatus_STATUS_UNSPECIFIED
+	}
 }

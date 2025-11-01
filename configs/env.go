@@ -11,6 +11,7 @@ type env struct {
 	configServerURL string
 	taskServerURL   string
 	rbmqServerURL   string
+	port            string
 	logger          *zap.SugaredLogger
 }
 
@@ -32,6 +33,7 @@ func NewEnv(logger *zap.SugaredLogger) *env {
 		configServerURL: os.Getenv("CONFIG_SERVER_URL"),
 		taskServerURL:   os.Getenv("TASK_SERVER_URL"),
 		rbmqServerURL:   os.Getenv("RBMQ_SERVER_URL"),
+		port:            os.Getenv("PORT"),
 		logger:          logger,
 	}
 }
@@ -55,4 +57,11 @@ func (m *env) GetQueueServerURL() string {
 		m.logger.Fatal("You forget to set the QUEUE_SERVER_URL environment variable!")
 	}
 	return m.rbmqServerURL
+}
+
+func (m *env) GetPort() string {
+	if m.port == "" {
+		m.logger.Fatal("You forget to set the PORT environment variable!")
+	}
+	return m.port
 }

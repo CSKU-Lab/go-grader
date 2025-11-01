@@ -10,7 +10,7 @@ import (
 type ResultService interface {
 	CreateRunResult(ctx context.Context, id string, result *models.RunResult) error
 	CreateGradeResult(ctx context.Context, id string, result *models.GradeResult) error
-	GetRunResultByID(ctx context.Context, id string) (*models.RunResult, error)
+	GetRunResultByID(ctx context.Context, id string) (*models.StoredRunResult, error)
 	GetGradeResultByID(ctx context.Context, id string) (*models.GradeResult, error)
 }
 
@@ -32,7 +32,7 @@ func (rs *resultService) CreateGradeResult(ctx context.Context, id string, resul
 	return rs.repo.CreateGradeResult(ctx, id, result)
 }
 
-func (rs *resultService) GetRunResultByID(ctx context.Context, id string) (*models.RunResult, error) {
+func (rs *resultService) GetRunResultByID(ctx context.Context, id string) (*models.StoredRunResult, error) {
 	return rs.repo.GetRunResultByID(ctx, id)
 }
 

@@ -73,7 +73,7 @@ func main() {
 
 	go func() {
 		err := q.Consume(ctx, "run", func(message []byte) {
-			execution := &models.Execution{}
+			execution := &models.RunExecution{}
 
 			err := json.Unmarshal(message, execution)
 			if err != nil {
@@ -86,8 +86,13 @@ func main() {
 			if err := executor.SetRunner(execution.RunnerID); err != nil {
 				logger.Fatalw("Cannot set runner", "error", err)
 			}
+
 			if err := executor.SetFiles(execution.Files); err != nil {
 				logger.Fatalw("Cannot set files", "error", err)
+			}
+
+			if err := executor.SetInput(execution.Input); err != nil {
+				logger.Fatalw("Cannot set input", "error", err)
 			}
 
 			result, err := executor.Run()
@@ -115,7 +120,7 @@ func main() {
 	}()
 
 	go q.Consume(ctx, "grade", func(message []byte) {
-		execution := &models.Execution{}
+		execution := &models.GradeExecution{}
 
 		err := json.Unmarshal(message, execution)
 		if err != nil {

@@ -83,7 +83,7 @@ func (s *sqlxInstance) CreateGradeResult(ctx context.Context, id string, result 
 	return tx.Commit()
 }
 
-func (s *sqlxInstance) GetRunResultByID(ctx context.Context, id string) (*models.RunResult, error) {
+func (s *sqlxInstance) GetRunResultByID(ctx context.Context, id string) (*models.StoredRunResult, error) {
 	query := `SELECT id, status, output, wall_time, memory FROM run_results WHERE id = $1`
 
 	var runResult runResultRow
@@ -92,10 +92,10 @@ func (s *sqlxInstance) GetRunResultByID(ctx context.Context, id string) (*models
 		return nil, err
 	}
 
-	return &models.RunResult{
+	return &models.StoredRunResult{
 		ID:       runResult.ID,
 		Status:   execution.Status(runResult.Status),
-		StdOut:   runResult.Output,
+		Output:   runResult.Output,
 		WallTime: runResult.WallTime,
 		Memory:   runResult.Memory,
 	}, nil
