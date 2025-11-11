@@ -156,14 +156,14 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		}
 	}
 
-	execution := models.RunExecution{
+	payload := models.RunExecution{
 		ID:       id.String(),
 		Files:    files,
 		Input:    req.GetInput(),
 		RunnerID: req.GetRunnerId(),
 	}
 
-	message, err := json.Marshal(&execution)
+	message, err := json.Marshal(&payload)
 	if err != nil {
 		s.logger.Fatalw("Cannot parse execution struct to json", "error", err)
 	}
@@ -174,12 +174,26 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 	}
 	s.logger.Info("Publish message to the queue successfully!")
 
-	err = s.q.ConsumeFromTopic(ctx, "topic.run_results", "result."+id.String(), 1, func(msg []byte) error {
+	err = stream.Send(&pb.RunResultResponse{
+		ExecutionId: id.String(),
+		Status:      executionStatusToProtoStatus(execution.QUEUED),
+	})
+	if err != nil {
+		s.logger.Errorln("Cannot send queued status to the client", "error", err)
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	err = s.q.ConsumeFromTopic(ctx, "topic.run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
 		result := &models.RunResult{}
 		err := json.Unmarshal(msg, result)
 		if err != nil {
 			s.logger.Errorln("Cannot unmarshal run result message", "error", err)
 			return err
+		}
+		s.logger.Infof("Received run result for execution ID %s with status %s", result.ID, result.Status)
+
+		if result.Status != execution.QUEUED && result.Status != execution.RUNNING {
+			exit <- struct{}{}
 		}
 
 		output := result.StdOut
@@ -299,6 +313,10 @@ func executionStatusToProtoStatus(status execution.Status) pb.ExecutionStatus {
 		return pb.ExecutionStatus_STATUS_SIGNAL_ERROR
 	case execution.GRADER_ERROR:
 		return pb.ExecutionStatus_STATUS_GRADER_ERROR
+	case execution.QUEUED:
+		return pb.ExecutionStatus_STATUS_QUEUED
+	case execution.RUNNING:
+		return pb.ExecutionStatus_STATUS_RUNNING
 	default:
 		return pb.ExecutionStatus_STATUS_UNSPECIFIED
 	}

@@ -11,4 +11,6 @@ const (
 	RUNTIME_ERROR         Status = "RUNTIME_ERROR"
 	SIGNAL_ERROR          Status = "SIGNAL_ERROR"
 	GRADER_ERROR          Status = "GRADER_ERROR"
+	QUEUED                Status = "QUEUED"
+	RUNNING               Status = "RUNNING"
 )

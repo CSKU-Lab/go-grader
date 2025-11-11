@@ -25,61 +25,62 @@ var File_config_v1_service_proto protoreflect.FileDescriptor
 
 const file_config_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x17config/v1/service.proto\x12\tconfig.v1\x1a\x18config/v1/compares.proto\x1a\x17config/v1/runners.proto\x1a\x1bgoogle/protobuf/empty.proto2\xfa\x05\n" +
-	"\rConfigService\x12K\n" +
+	"\x17config/v1/service.proto\x12\tconfig.v1\x1a\x18config/v1/compares.proto\x1a\x17config/v1/runners.proto\x1a\x1bgoogle/protobuf/empty.proto2\x8b\x06\n" +
+	"\rConfigService\x12Q\n" +
+	"\fCreateRunner\x12\x1e.config.v1.CreateRunnerRequest\x1a\x1f.config.v1.CreateRunnerResponse\"\x00\x12K\n" +
 	"\n" +
 	"GetRunners\x12\x1c.config.v1.GetRunnersRequest\x1a\x1d.config.v1.GetRunnersResponse\"\x00\x12E\n" +
-	"\tGetRunner\x12\x1b.config.v1.GetRunnerRequest\x1a\x19.config.v1.RunnerResponse\"\x00\x12E\n" +
-	"\tAddRunner\x12\x1b.config.v1.AddRunnerRequest\x1a\x19.config.v1.RunnerResponse\"\x00\x12K\n" +
-	"\fUpdateRunner\x12\x1e.config.v1.UpdateRunnerRequest\x1a\x19.config.v1.RunnerResponse\"\x00\x12H\n" +
-	"\fDeleteRunner\x12\x1e.config.v1.DeleteRunnerRequest\x1a\x16.google.protobuf.Empty\"\x00\x12G\n" +
+	"\tGetRunner\x12\x1b.config.v1.GetRunnerRequest\x1a\x19.config.v1.RunnerResponse\"\x00\x12H\n" +
+	"\fUpdateRunner\x12\x1e.config.v1.UpdateRunnerRequest\x1a\x16.google.protobuf.Empty\"\x00\x12H\n" +
+	"\fDeleteRunner\x12\x1e.config.v1.DeleteRunnerRequest\x1a\x16.google.protobuf.Empty\"\x00\x12T\n" +
+	"\rCreateCompare\x12\x1f.config.v1.CreateCompareRequest\x1a .config.v1.CreateCompareResponse\"\x00\x12G\n" +
 	"\vGetCompares\x12\x16.google.protobuf.Empty\x1a\x1e.config.v1.GetComparesResponse\"\x00\x12H\n" +
 	"\n" +
-	"GetCompare\x12\x1c.config.v1.GetCompareRequest\x1a\x1a.config.v1.CompareResponse\"\x00\x12H\n" +
-	"\n" +
-	"AddCompare\x12\x1c.config.v1.AddCompareRequest\x1a\x1a.config.v1.CompareResponse\"\x00\x12N\n" +
-	"\rUpdateCompare\x12\x1f.config.v1.UpdateCompareRequest\x1a\x1a.config.v1.CompareResponse\"\x00\x12J\n" +
+	"GetCompare\x12\x1c.config.v1.GetCompareRequest\x1a\x1a.config.v1.CompareResponse\"\x00\x12J\n" +
+	"\rUpdateCompare\x12\x1f.config.v1.UpdateCompareRequest\x1a\x16.google.protobuf.Empty\"\x00\x12J\n" +
 	"\rDeleteCompare\x12\x1f.config.v1.DeleteCompareRequest\x1a\x16.google.protobuf.Empty\"\x00B\x94\x01\n" +
 	"\rcom.config.v1B\fServiceProtoP\x01Z0github.com/CSKU-Lab/config-server/grpc/config/v1\xa2\x02\x03CXX\xaa\x02\tConfig.V1\xca\x02\tConfig\\V1\xe2\x02\x15Config\\V1\\GPBMetadata\xea\x02\n" +
 	"Config::V1b\x06proto3"
 
 var file_config_v1_service_proto_goTypes = []any{
-	(*GetRunnersRequest)(nil),    // 0: config.v1.GetRunnersRequest
-	(*GetRunnerRequest)(nil),     // 1: config.v1.GetRunnerRequest
-	(*AddRunnerRequest)(nil),     // 2: config.v1.AddRunnerRequest
-	(*UpdateRunnerRequest)(nil),  // 3: config.v1.UpdateRunnerRequest
-	(*DeleteRunnerRequest)(nil),  // 4: config.v1.DeleteRunnerRequest
-	(*emptypb.Empty)(nil),        // 5: google.protobuf.Empty
-	(*GetCompareRequest)(nil),    // 6: config.v1.GetCompareRequest
-	(*AddCompareRequest)(nil),    // 7: config.v1.AddCompareRequest
-	(*UpdateCompareRequest)(nil), // 8: config.v1.UpdateCompareRequest
-	(*DeleteCompareRequest)(nil), // 9: config.v1.DeleteCompareRequest
-	(*GetRunnersResponse)(nil),   // 10: config.v1.GetRunnersResponse
-	(*RunnerResponse)(nil),       // 11: config.v1.RunnerResponse
-	(*GetComparesResponse)(nil),  // 12: config.v1.GetComparesResponse
-	(*CompareResponse)(nil),      // 13: config.v1.CompareResponse
+	(*CreateRunnerRequest)(nil),   // 0: config.v1.CreateRunnerRequest
+	(*GetRunnersRequest)(nil),     // 1: config.v1.GetRunnersRequest
+	(*GetRunnerRequest)(nil),      // 2: config.v1.GetRunnerRequest
+	(*UpdateRunnerRequest)(nil),   // 3: config.v1.UpdateRunnerRequest
+	(*DeleteRunnerRequest)(nil),   // 4: config.v1.DeleteRunnerRequest
+	(*CreateCompareRequest)(nil),  // 5: config.v1.CreateCompareRequest
+	(*emptypb.Empty)(nil),         // 6: google.protobuf.Empty
+	(*GetCompareRequest)(nil),     // 7: config.v1.GetCompareRequest
+	(*UpdateCompareRequest)(nil),  // 8: config.v1.UpdateCompareRequest
+	(*DeleteCompareRequest)(nil),  // 9: config.v1.DeleteCompareRequest
+	(*CreateRunnerResponse)(nil),  // 10: config.v1.CreateRunnerResponse
+	(*GetRunnersResponse)(nil),    // 11: config.v1.GetRunnersResponse
+	(*RunnerResponse)(nil),        // 12: config.v1.RunnerResponse
+	(*CreateCompareResponse)(nil), // 13: config.v1.CreateCompareResponse
+	(*GetComparesResponse)(nil),   // 14: config.v1.GetComparesResponse
+	(*CompareResponse)(nil),       // 15: config.v1.CompareResponse
 }
 var file_config_v1_service_proto_depIdxs = []int32{
-	0,  // 0: config.v1.ConfigService.GetRunners:input_type -> config.v1.GetRunnersRequest
-	1,  // 1: config.v1.ConfigService.GetRunner:input_type -> config.v1.GetRunnerRequest
-	2,  // 2: config.v1.ConfigService.AddRunner:input_type -> config.v1.AddRunnerRequest
+	0,  // 0: config.v1.ConfigService.CreateRunner:input_type -> config.v1.CreateRunnerRequest
+	1,  // 1: config.v1.ConfigService.GetRunners:input_type -> config.v1.GetRunnersRequest
+	2,  // 2: config.v1.ConfigService.GetRunner:input_type -> config.v1.GetRunnerRequest
 	3,  // 3: config.v1.ConfigService.UpdateRunner:input_type -> config.v1.UpdateRunnerRequest
 	4,  // 4: config.v1.ConfigService.DeleteRunner:input_type -> config.v1.DeleteRunnerRequest
-	5,  // 5: config.v1.ConfigService.GetCompares:input_type -> google.protobuf.Empty
-	6,  // 6: config.v1.ConfigService.GetCompare:input_type -> config.v1.GetCompareRequest
-	7,  // 7: config.v1.ConfigService.AddCompare:input_type -> config.v1.AddCompareRequest
+	5,  // 5: config.v1.ConfigService.CreateCompare:input_type -> config.v1.CreateCompareRequest
+	6,  // 6: config.v1.ConfigService.GetCompares:input_type -> google.protobuf.Empty
+	7,  // 7: config.v1.ConfigService.GetCompare:input_type -> config.v1.GetCompareRequest
 	8,  // 8: config.v1.ConfigService.UpdateCompare:input_type -> config.v1.UpdateCompareRequest
 	9,  // 9: config.v1.ConfigService.DeleteCompare:input_type -> config.v1.DeleteCompareRequest
-	10, // 10: config.v1.ConfigService.GetRunners:output_type -> config.v1.GetRunnersResponse
-	11, // 11: config.v1.ConfigService.GetRunner:output_type -> config.v1.RunnerResponse
-	11, // 12: config.v1.ConfigService.AddRunner:output_type -> config.v1.RunnerResponse
-	11, // 13: config.v1.ConfigService.UpdateRunner:output_type -> config.v1.RunnerResponse
-	5,  // 14: config.v1.ConfigService.DeleteRunner:output_type -> google.protobuf.Empty
-	12, // 15: config.v1.ConfigService.GetCompares:output_type -> config.v1.GetComparesResponse
-	13, // 16: config.v1.ConfigService.GetCompare:output_type -> config.v1.CompareResponse
-	13, // 17: config.v1.ConfigService.AddCompare:output_type -> config.v1.CompareResponse
-	13, // 18: config.v1.ConfigService.UpdateCompare:output_type -> config.v1.CompareResponse
-	5,  // 19: config.v1.ConfigService.DeleteCompare:output_type -> google.protobuf.Empty
+	10, // 10: config.v1.ConfigService.CreateRunner:output_type -> config.v1.CreateRunnerResponse
+	11, // 11: config.v1.ConfigService.GetRunners:output_type -> config.v1.GetRunnersResponse
+	12, // 12: config.v1.ConfigService.GetRunner:output_type -> config.v1.RunnerResponse
+	6,  // 13: config.v1.ConfigService.UpdateRunner:output_type -> google.protobuf.Empty
+	6,  // 14: config.v1.ConfigService.DeleteRunner:output_type -> google.protobuf.Empty
+	13, // 15: config.v1.ConfigService.CreateCompare:output_type -> config.v1.CreateCompareResponse
+	14, // 16: config.v1.ConfigService.GetCompares:output_type -> config.v1.GetComparesResponse
+	15, // 17: config.v1.ConfigService.GetCompare:output_type -> config.v1.CompareResponse
+	6,  // 18: config.v1.ConfigService.UpdateCompare:output_type -> google.protobuf.Empty
+	6,  // 19: config.v1.ConfigService.DeleteCompare:output_type -> google.protobuf.Empty
 	10, // [10:20] is the sub-list for method output_type
 	0,  // [0:10] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name

@@ -297,7 +297,7 @@ func (x *RunnerResponse) GetRunScript() string {
 	return ""
 }
 
-type AddRunnerRequest struct {
+type CreateRunnerRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	BuildScript   *string                `protobuf:"bytes,2,opt,name=build_script,json=buildScript,proto3,oneof" json:"build_script,omitempty"`
@@ -306,20 +306,20 @@ type AddRunnerRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AddRunnerRequest) Reset() {
-	*x = AddRunnerRequest{}
+func (x *CreateRunnerRequest) Reset() {
+	*x = CreateRunnerRequest{}
 	mi := &file_config_v1_runners_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AddRunnerRequest) String() string {
+func (x *CreateRunnerRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AddRunnerRequest) ProtoMessage() {}
+func (*CreateRunnerRequest) ProtoMessage() {}
 
-func (x *AddRunnerRequest) ProtoReflect() protoreflect.Message {
+func (x *CreateRunnerRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_config_v1_runners_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -331,28 +331,72 @@ func (x *AddRunnerRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AddRunnerRequest.ProtoReflect.Descriptor instead.
-func (*AddRunnerRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateRunnerRequest.ProtoReflect.Descriptor instead.
+func (*CreateRunnerRequest) Descriptor() ([]byte, []int) {
 	return file_config_v1_runners_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *AddRunnerRequest) GetName() string {
+func (x *CreateRunnerRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *AddRunnerRequest) GetBuildScript() string {
+func (x *CreateRunnerRequest) GetBuildScript() string {
 	if x != nil && x.BuildScript != nil {
 		return *x.BuildScript
 	}
 	return ""
 }
 
-func (x *AddRunnerRequest) GetRunScript() string {
+func (x *CreateRunnerRequest) GetRunScript() string {
 	if x != nil {
 		return x.RunScript
+	}
+	return ""
+}
+
+type CreateRunnerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRunnerResponse) Reset() {
+	*x = CreateRunnerResponse{}
+	mi := &file_config_v1_runners_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRunnerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRunnerResponse) ProtoMessage() {}
+
+func (x *CreateRunnerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_config_v1_runners_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRunnerResponse.ProtoReflect.Descriptor instead.
+func (*CreateRunnerResponse) Descriptor() ([]byte, []int) {
+	return file_config_v1_runners_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CreateRunnerResponse) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
 }
@@ -369,7 +413,7 @@ type UpdateRunnerRequest struct {
 
 func (x *UpdateRunnerRequest) Reset() {
 	*x = UpdateRunnerRequest{}
-	mi := &file_config_v1_runners_proto_msgTypes[6]
+	mi := &file_config_v1_runners_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -381,7 +425,7 @@ func (x *UpdateRunnerRequest) String() string {
 func (*UpdateRunnerRequest) ProtoMessage() {}
 
 func (x *UpdateRunnerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_config_v1_runners_proto_msgTypes[6]
+	mi := &file_config_v1_runners_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +438,7 @@ func (x *UpdateRunnerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRunnerRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRunnerRequest) Descriptor() ([]byte, []int) {
-	return file_config_v1_runners_proto_rawDescGZIP(), []int{6}
+	return file_config_v1_runners_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UpdateRunnerRequest) GetId() string {
@@ -434,7 +478,7 @@ type DeleteRunnerRequest struct {
 
 func (x *DeleteRunnerRequest) Reset() {
 	*x = DeleteRunnerRequest{}
-	mi := &file_config_v1_runners_proto_msgTypes[7]
+	mi := &file_config_v1_runners_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -446,7 +490,7 @@ func (x *DeleteRunnerRequest) String() string {
 func (*DeleteRunnerRequest) ProtoMessage() {}
 
 func (x *DeleteRunnerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_config_v1_runners_proto_msgTypes[7]
+	mi := &file_config_v1_runners_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -459,7 +503,7 @@ func (x *DeleteRunnerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRunnerRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRunnerRequest) Descriptor() ([]byte, []int) {
-	return file_config_v1_runners_proto_rawDescGZIP(), []int{7}
+	return file_config_v1_runners_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeleteRunnerRequest) GetId() string {
@@ -494,13 +538,15 @@ const file_config_v1_runners_proto_rawDesc = "" +
 	"\fbuild_script\x18\x03 \x01(\tH\x00R\vbuildScript\x88\x01\x01\x12\x1d\n" +
 	"\n" +
 	"run_script\x18\x04 \x01(\tR\trunScriptB\x0f\n" +
-	"\r_build_script\"~\n" +
-	"\x10AddRunnerRequest\x12\x12\n" +
+	"\r_build_script\"\x81\x01\n" +
+	"\x13CreateRunnerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\fbuild_script\x18\x02 \x01(\tH\x00R\vbuildScript\x88\x01\x01\x12\x1d\n" +
 	"\n" +
 	"run_script\x18\x03 \x01(\tR\trunScriptB\x0f\n" +
-	"\r_build_script\"\xb3\x01\n" +
+	"\r_build_script\"&\n" +
+	"\x14CreateRunnerResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xb3\x01\n" +
 	"\x13UpdateRunnerRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12&\n" +
@@ -527,16 +573,17 @@ func file_config_v1_runners_proto_rawDescGZIP() []byte {
 	return file_config_v1_runners_proto_rawDescData
 }
 
-var file_config_v1_runners_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_config_v1_runners_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_config_v1_runners_proto_goTypes = []any{
-	(*GetRunnersResponse)(nil),  // 0: config.v1.GetRunnersResponse
-	(*GetRunnersRequest)(nil),   // 1: config.v1.GetRunnersRequest
-	(*GetRunnerRequest)(nil),    // 2: config.v1.GetRunnerRequest
-	(*Runner)(nil),              // 3: config.v1.Runner
-	(*RunnerResponse)(nil),      // 4: config.v1.RunnerResponse
-	(*AddRunnerRequest)(nil),    // 5: config.v1.AddRunnerRequest
-	(*UpdateRunnerRequest)(nil), // 6: config.v1.UpdateRunnerRequest
-	(*DeleteRunnerRequest)(nil), // 7: config.v1.DeleteRunnerRequest
+	(*GetRunnersResponse)(nil),   // 0: config.v1.GetRunnersResponse
+	(*GetRunnersRequest)(nil),    // 1: config.v1.GetRunnersRequest
+	(*GetRunnerRequest)(nil),     // 2: config.v1.GetRunnerRequest
+	(*Runner)(nil),               // 3: config.v1.Runner
+	(*RunnerResponse)(nil),       // 4: config.v1.RunnerResponse
+	(*CreateRunnerRequest)(nil),  // 5: config.v1.CreateRunnerRequest
+	(*CreateRunnerResponse)(nil), // 6: config.v1.CreateRunnerResponse
+	(*UpdateRunnerRequest)(nil),  // 7: config.v1.UpdateRunnerRequest
+	(*DeleteRunnerRequest)(nil),  // 8: config.v1.DeleteRunnerRequest
 }
 var file_config_v1_runners_proto_depIdxs = []int32{
 	3, // 0: config.v1.GetRunnersResponse.runners:type_name -> config.v1.Runner
@@ -555,14 +602,14 @@ func file_config_v1_runners_proto_init() {
 	file_config_v1_runners_proto_msgTypes[3].OneofWrappers = []any{}
 	file_config_v1_runners_proto_msgTypes[4].OneofWrappers = []any{}
 	file_config_v1_runners_proto_msgTypes[5].OneofWrappers = []any{}
-	file_config_v1_runners_proto_msgTypes[6].OneofWrappers = []any{}
+	file_config_v1_runners_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_config_v1_runners_proto_rawDesc), len(file_config_v1_runners_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

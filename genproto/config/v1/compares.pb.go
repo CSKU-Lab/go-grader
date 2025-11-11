@@ -253,7 +253,7 @@ func (x *GetCompareRequest) GetId() string {
 	return ""
 }
 
-type AddCompareRequest struct {
+type CreateCompareRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Script        string                 `protobuf:"bytes,2,opt,name=script,proto3" json:"script,omitempty"`
@@ -266,20 +266,20 @@ type AddCompareRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AddCompareRequest) Reset() {
-	*x = AddCompareRequest{}
+func (x *CreateCompareRequest) Reset() {
+	*x = CreateCompareRequest{}
 	mi := &file_config_v1_compares_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AddCompareRequest) String() string {
+func (x *CreateCompareRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AddCompareRequest) ProtoMessage() {}
+func (*CreateCompareRequest) ProtoMessage() {}
 
-func (x *AddCompareRequest) ProtoReflect() protoreflect.Message {
+func (x *CreateCompareRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_config_v1_compares_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -291,58 +291,102 @@ func (x *AddCompareRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AddCompareRequest.ProtoReflect.Descriptor instead.
-func (*AddCompareRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateCompareRequest.ProtoReflect.Descriptor instead.
+func (*CreateCompareRequest) Descriptor() ([]byte, []int) {
 	return file_config_v1_compares_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *AddCompareRequest) GetName() string {
+func (x *CreateCompareRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *AddCompareRequest) GetScript() string {
+func (x *CreateCompareRequest) GetScript() string {
 	if x != nil {
 		return x.Script
 	}
 	return ""
 }
 
-func (x *AddCompareRequest) GetBuildScript() string {
+func (x *CreateCompareRequest) GetBuildScript() string {
 	if x != nil {
 		return x.BuildScript
 	}
 	return ""
 }
 
-func (x *AddCompareRequest) GetRunScript() string {
+func (x *CreateCompareRequest) GetRunScript() string {
 	if x != nil {
 		return x.RunScript
 	}
 	return ""
 }
 
-func (x *AddCompareRequest) GetRunName() string {
+func (x *CreateCompareRequest) GetRunName() string {
 	if x != nil {
 		return x.RunName
 	}
 	return ""
 }
 
-func (x *AddCompareRequest) GetDescription() string {
+func (x *CreateCompareRequest) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
 	return ""
 }
 
-func (x *AddCompareRequest) GetFiles() []*File {
+func (x *CreateCompareRequest) GetFiles() []*File {
 	if x != nil {
 		return x.Files
 	}
 	return nil
+}
+
+type CreateCompareResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateCompareResponse) Reset() {
+	*x = CreateCompareResponse{}
+	mi := &file_config_v1_compares_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateCompareResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateCompareResponse) ProtoMessage() {}
+
+func (x *CreateCompareResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_config_v1_compares_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateCompareResponse.ProtoReflect.Descriptor instead.
+func (*CreateCompareResponse) Descriptor() ([]byte, []int) {
+	return file_config_v1_compares_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CreateCompareResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
 }
 
 type UpdateCompareRequest struct {
@@ -361,7 +405,7 @@ type UpdateCompareRequest struct {
 
 func (x *UpdateCompareRequest) Reset() {
 	*x = UpdateCompareRequest{}
-	mi := &file_config_v1_compares_proto_msgTypes[5]
+	mi := &file_config_v1_compares_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -373,7 +417,7 @@ func (x *UpdateCompareRequest) String() string {
 func (*UpdateCompareRequest) ProtoMessage() {}
 
 func (x *UpdateCompareRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_config_v1_compares_proto_msgTypes[5]
+	mi := &file_config_v1_compares_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -386,7 +430,7 @@ func (x *UpdateCompareRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCompareRequest.ProtoReflect.Descriptor instead.
 func (*UpdateCompareRequest) Descriptor() ([]byte, []int) {
-	return file_config_v1_compares_proto_rawDescGZIP(), []int{5}
+	return file_config_v1_compares_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateCompareRequest) GetId() string {
@@ -454,7 +498,7 @@ type DeleteCompareRequest struct {
 
 func (x *DeleteCompareRequest) Reset() {
 	*x = DeleteCompareRequest{}
-	mi := &file_config_v1_compares_proto_msgTypes[6]
+	mi := &file_config_v1_compares_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -466,7 +510,7 @@ func (x *DeleteCompareRequest) String() string {
 func (*DeleteCompareRequest) ProtoMessage() {}
 
 func (x *DeleteCompareRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_config_v1_compares_proto_msgTypes[6]
+	mi := &file_config_v1_compares_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -479,7 +523,7 @@ func (x *DeleteCompareRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteCompareRequest.ProtoReflect.Descriptor instead.
 func (*DeleteCompareRequest) Descriptor() ([]byte, []int) {
-	return file_config_v1_compares_proto_rawDescGZIP(), []int{6}
+	return file_config_v1_compares_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeleteCompareRequest) GetId() string {
@@ -511,8 +555,8 @@ const file_config_v1_compares_proto_rawDesc = "" +
 	"\x13GetComparesResponse\x126\n" +
 	"\bcompares\x18\x01 \x03(\v2\x1a.config.v1.CompareResponseR\bcompares\"#\n" +
 	"\x11GetCompareRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xf1\x01\n" +
-	"\x11AddCompareRequest\x12\x12\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xf4\x01\n" +
+	"\x14CreateCompareRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06script\x18\x02 \x01(\tR\x06script\x12!\n" +
 	"\fbuild_script\x18\x03 \x01(\tR\vbuildScript\x12\x1d\n" +
@@ -520,7 +564,9 @@ const file_config_v1_compares_proto_rawDesc = "" +
 	"run_script\x18\x04 \x01(\tR\trunScript\x12\x19\n" +
 	"\brun_name\x18\x06 \x01(\tR\arunName\x12 \n" +
 	"\vdescription\x18\a \x01(\tR\vdescription\x12%\n" +
-	"\x05files\x18\t \x03(\v2\x0f.config.v1.FileR\x05filesJ\x04\b\x05\x10\x06J\x04\b\b\x10\t\"\xf3\x02\n" +
+	"\x05files\x18\t \x03(\v2\x0f.config.v1.FileR\x05filesJ\x04\b\x05\x10\x06J\x04\b\b\x10\t\"'\n" +
+	"\x15CreateCompareResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xf3\x02\n" +
 	"\x14UpdateCompareRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1b\n" +
@@ -556,20 +602,21 @@ func file_config_v1_compares_proto_rawDescGZIP() []byte {
 	return file_config_v1_compares_proto_rawDescData
 }
 
-var file_config_v1_compares_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_config_v1_compares_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_config_v1_compares_proto_goTypes = []any{
-	(*File)(nil),                 // 0: config.v1.File
-	(*CompareResponse)(nil),      // 1: config.v1.CompareResponse
-	(*GetComparesResponse)(nil),  // 2: config.v1.GetComparesResponse
-	(*GetCompareRequest)(nil),    // 3: config.v1.GetCompareRequest
-	(*AddCompareRequest)(nil),    // 4: config.v1.AddCompareRequest
-	(*UpdateCompareRequest)(nil), // 5: config.v1.UpdateCompareRequest
-	(*DeleteCompareRequest)(nil), // 6: config.v1.DeleteCompareRequest
+	(*File)(nil),                  // 0: config.v1.File
+	(*CompareResponse)(nil),       // 1: config.v1.CompareResponse
+	(*GetComparesResponse)(nil),   // 2: config.v1.GetComparesResponse
+	(*GetCompareRequest)(nil),     // 3: config.v1.GetCompareRequest
+	(*CreateCompareRequest)(nil),  // 4: config.v1.CreateCompareRequest
+	(*CreateCompareResponse)(nil), // 5: config.v1.CreateCompareResponse
+	(*UpdateCompareRequest)(nil),  // 6: config.v1.UpdateCompareRequest
+	(*DeleteCompareRequest)(nil),  // 7: config.v1.DeleteCompareRequest
 }
 var file_config_v1_compares_proto_depIdxs = []int32{
 	0, // 0: config.v1.CompareResponse.files:type_name -> config.v1.File
 	1, // 1: config.v1.GetComparesResponse.compares:type_name -> config.v1.CompareResponse
-	0, // 2: config.v1.AddCompareRequest.files:type_name -> config.v1.File
+	0, // 2: config.v1.CreateCompareRequest.files:type_name -> config.v1.File
 	0, // 3: config.v1.UpdateCompareRequest.files:type_name -> config.v1.File
 	4, // [4:4] is the sub-list for method output_type
 	4, // [4:4] is the sub-list for method input_type
@@ -583,14 +630,14 @@ func file_config_v1_compares_proto_init() {
 	if File_config_v1_compares_proto != nil {
 		return
 	}
-	file_config_v1_compares_proto_msgTypes[5].OneofWrappers = []any{}
+	file_config_v1_compares_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_config_v1_compares_proto_rawDesc), len(file_config_v1_compares_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

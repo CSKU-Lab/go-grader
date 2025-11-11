@@ -33,20 +33,24 @@ const (
 	ExecutionStatus_STATUS_RUNTIME_ERROR         ExecutionStatus = 6
 	ExecutionStatus_STATUS_SIGNAL_ERROR          ExecutionStatus = 7
 	ExecutionStatus_STATUS_GRADER_ERROR          ExecutionStatus = 8
+	ExecutionStatus_STATUS_QUEUED                ExecutionStatus = 9
+	ExecutionStatus_STATUS_RUNNING               ExecutionStatus = 10
 )
 
 // Enum value maps for ExecutionStatus.
 var (
 	ExecutionStatus_name = map[int32]string{
-		0: "STATUS_UNSPECIFIED",
-		1: "STATUS_COMPILE_FAILED",
-		2: "STATUS_RUN_PASSED",
-		3: "STATUS_RUN_FAILED",
-		4: "STATUS_TIME_LIMIT_EXCEEDED",
-		5: "STATUS_MEMORY_LIMIT_EXCEEDED",
-		6: "STATUS_RUNTIME_ERROR",
-		7: "STATUS_SIGNAL_ERROR",
-		8: "STATUS_GRADER_ERROR",
+		0:  "STATUS_UNSPECIFIED",
+		1:  "STATUS_COMPILE_FAILED",
+		2:  "STATUS_RUN_PASSED",
+		3:  "STATUS_RUN_FAILED",
+		4:  "STATUS_TIME_LIMIT_EXCEEDED",
+		5:  "STATUS_MEMORY_LIMIT_EXCEEDED",
+		6:  "STATUS_RUNTIME_ERROR",
+		7:  "STATUS_SIGNAL_ERROR",
+		8:  "STATUS_GRADER_ERROR",
+		9:  "STATUS_QUEUED",
+		10: "STATUS_RUNNING",
 	}
 	ExecutionStatus_value = map[string]int32{
 		"STATUS_UNSPECIFIED":           0,
@@ -58,6 +62,8 @@ var (
 		"STATUS_RUNTIME_ERROR":         6,
 		"STATUS_SIGNAL_ERROR":          7,
 		"STATUS_GRADER_ERROR":          8,
+		"STATUS_QUEUED":                9,
+		"STATUS_RUNNING":               10,
 	}
 )
 
@@ -708,7 +714,7 @@ const file_grader_v1_messages_proto_rawDesc = "" +
 	"\x11test_case_results\x18\x03 \x03(\v2\x19.grader.v1.TestCaseResultR\x0ftestCaseResults\x12\"\n" +
 	"\ravg_wall_time\x18\x04 \x01(\x02R\vavgWallTime\x12\x1d\n" +
 	"\n" +
-	"avg_memory\x18\x05 \x01(\x05R\tavgMemory*\x80\x02\n" +
+	"avg_memory\x18\x05 \x01(\x05R\tavgMemory*\xa7\x02\n" +
 	"\x0fExecutionStatus\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15STATUS_COMPILE_FAILED\x10\x01\x12\x15\n" +
@@ -718,7 +724,10 @@ const file_grader_v1_messages_proto_rawDesc = "" +
 	"\x1cSTATUS_MEMORY_LIMIT_EXCEEDED\x10\x05\x12\x18\n" +
 	"\x14STATUS_RUNTIME_ERROR\x10\x06\x12\x17\n" +
 	"\x13STATUS_SIGNAL_ERROR\x10\a\x12\x17\n" +
-	"\x13STATUS_GRADER_ERROR\x10\bB\x95\x01\n" +
+	"\x13STATUS_GRADER_ERROR\x10\b\x12\x11\n" +
+	"\rSTATUS_QUEUED\x10\t\x12\x12\n" +
+	"\x0eSTATUS_RUNNING\x10\n" +
+	"B\x95\x01\n" +
 	"\rcom.grader.v1B\rMessagesProtoP\x01Z0github.com/CSKU-Lab/grader-server/grpc/grader/v1\xa2\x02\x03GXX\xaa\x02\tGrader.V1\xca\x02\tGrader\\V1\xe2\x02\x15Grader\\V1\\GPBMetadata\xea\x02\n" +
 	"Grader::V1b\x06proto3"
 

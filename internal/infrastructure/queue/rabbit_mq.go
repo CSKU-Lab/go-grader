@@ -146,7 +146,7 @@ func (r *rabbitmq) PublishToTopic(ctx context.Context, topic string, key string,
 	}
 }
 
-func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key string, prefetchCount int, handler func(message []byte) error) error {
+func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key string, prefetchCount int, handler func(message []byte, exit chan struct{}) error) error {
 	q, err := r.ch.QueueDeclare("", false, true, true, false, nil)
 	if err != nil {
 		return err
@@ -157,10 +157,14 @@ func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key strin
 		return err
 	}
 
-	msgs, err := r.ch.Consume(q.Name, "", true, true, false, false, nil)
+	exitChan := make(chan struct{}, 1)
 
+	msgs, err := r.ch.Consume(q.Name, "", true, true, false, false, nil)
 	for {
 		select {
+		case <-exitChan:
+			r.logger.Infoln("Exit signal received, stopping consuming messages from the queue")
+			return nil
 		case <-ctx.Done():
 			r.logger.Errorln("Context has been doned", ctx.Err())
 			return ctx.Err()
@@ -176,12 +180,10 @@ func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key strin
 				r.logger.Info("Message consumed")
 			}
 
-			err := handler(msg.Body)
+			err := handler(msg.Body, exitChan)
 			if err != nil {
 				return err
 			}
-			// this is temporaly for now
-			return nil
 		}
 	}
 }

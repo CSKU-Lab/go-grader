@@ -10,6 +10,7 @@ import (
 
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants"
+	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
 	configPB "github.com/CSKU-Lab/go-grader/genproto/config/v1"
@@ -74,9 +75,9 @@ func main() {
 
 	go func() {
 		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(message []byte) error {
-			execution := &models.RunExecution{}
+			payload := &models.RunExecution{}
 
-			err := json.Unmarshal(message, execution)
+			err := json.Unmarshal(message, payload)
 			if err != nil {
 				logger.Fatalw("Cannot unmarshal message", "error", err)
 			}
@@ -84,16 +85,29 @@ func main() {
 			executor := executorService.NewExecutor()
 			defer executor.Cleanup()
 
-			if err := executor.SetRunner(execution.RunnerID); err != nil {
+			if err := executor.SetRunner(payload.RunnerID); err != nil {
 				logger.Fatalw("Cannot set runner", "error", err)
 			}
 
-			if err := executor.SetFiles(execution.Files); err != nil {
+			if err := executor.SetFiles(payload.Files); err != nil {
 				logger.Fatalw("Cannot set files", "error", err)
 			}
 
-			if err := executor.SetInput(execution.Input); err != nil {
+			if err := executor.SetInput(payload.Input); err != nil {
 				logger.Fatalw("Cannot set input", "error", err)
+			}
+
+			bytesResult, err := json.Marshal(models.RunResult{
+				ID:     payload.ID,
+				Status: execution.RUNNING,
+			})
+			if err != nil {
+				logger.Errorw("Cannot marshal run result", "error", err)
+			}
+
+			err = q.PublishToTopic(ctx, "topic.run_results", "result."+payload.ID, payload.ID, bytesResult)
+			if err != nil {
+				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
 
 			result, err := executor.Run()
@@ -101,14 +115,14 @@ func main() {
 				logger.Fatalw("Error from runner", "error", err)
 			}
 
-			result.ID = execution.ID
+			result.ID = payload.ID
 
-			bytesResult, err := json.Marshal(result)
+			bytesResult, err = json.Marshal(result)
 			if err != nil {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.PublishToTopic(ctx, "topic.run_results", "result."+execution.ID, execution.ID, bytesResult)
+			err = q.PublishToTopic(ctx, "topic.run_results", "result."+payload.ID, payload.ID, bytesResult)
 			if err != nil {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
