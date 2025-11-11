@@ -29,7 +29,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GraderServiceClient interface {
-	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (*RunResponse, error)
+	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunResultResponse], error)
 	GetRunResult(ctx context.Context, in *GetRunResultRequest, opts ...grpc.CallOption) (*RunResultResponse, error)
 	Grade(ctx context.Context, in *GradeRequest, opts ...grpc.CallOption) (*GradedResponse, error)
 	GetGradeResult(ctx context.Context, in *GetGradeResultRequest, opts ...grpc.CallOption) (*GradeResultResponse, error)
@@ -43,15 +43,24 @@ func NewGraderServiceClient(cc grpc.ClientConnInterface) GraderServiceClient {
 	return &graderServiceClient{cc}
 }
 
-func (c *graderServiceClient) Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (*RunResponse, error) {
+func (c *graderServiceClient) Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunResultResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RunResponse)
-	err := c.cc.Invoke(ctx, GraderService_Run_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &GraderService_ServiceDesc.Streams[0], GraderService_Run_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[RunRequest, RunResultResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GraderService_RunClient = grpc.ServerStreamingClient[RunResultResponse]
 
 func (c *graderServiceClient) GetRunResult(ctx context.Context, in *GetRunResultRequest, opts ...grpc.CallOption) (*RunResultResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -87,7 +96,7 @@ func (c *graderServiceClient) GetGradeResult(ctx context.Context, in *GetGradeRe
 // All implementations must embed UnimplementedGraderServiceServer
 // for forward compatibility.
 type GraderServiceServer interface {
-	Run(context.Context, *RunRequest) (*RunResponse, error)
+	Run(*RunRequest, grpc.ServerStreamingServer[RunResultResponse]) error
 	GetRunResult(context.Context, *GetRunResultRequest) (*RunResultResponse, error)
 	Grade(context.Context, *GradeRequest) (*GradedResponse, error)
 	GetGradeResult(context.Context, *GetGradeResultRequest) (*GradeResultResponse, error)
@@ -101,8 +110,8 @@ type GraderServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedGraderServiceServer struct{}
 
-func (UnimplementedGraderServiceServer) Run(context.Context, *RunRequest) (*RunResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Run not implemented")
+func (UnimplementedGraderServiceServer) Run(*RunRequest, grpc.ServerStreamingServer[RunResultResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method Run not implemented")
 }
 func (UnimplementedGraderServiceServer) GetRunResult(context.Context, *GetRunResultRequest) (*RunResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRunResult not implemented")
@@ -134,23 +143,16 @@ func RegisterGraderServiceServer(s grpc.ServiceRegistrar, srv GraderServiceServe
 	s.RegisterService(&GraderService_ServiceDesc, srv)
 }
 
-func _GraderService_Run_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RunRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+func _GraderService_Run_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RunRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(GraderServiceServer).Run(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: GraderService_Run_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GraderServiceServer).Run(ctx, req.(*RunRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(GraderServiceServer).Run(m, &grpc.GenericServerStream[RunRequest, RunResultResponse]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GraderService_RunServer = grpc.ServerStreamingServer[RunResultResponse]
 
 func _GraderService_GetRunResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRunResultRequest)
@@ -214,10 +216,6 @@ var GraderService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*GraderServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Run",
-			Handler:    _GraderService_Run_Handler,
-		},
-		{
 			MethodName: "GetRunResult",
 			Handler:    _GraderService_GetRunResult_Handler,
 		},
@@ -230,6 +228,12 @@ var GraderService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GraderService_GetGradeResult_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Run",
+			Handler:       _GraderService_Run_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "grader/v1/service.proto",
 }

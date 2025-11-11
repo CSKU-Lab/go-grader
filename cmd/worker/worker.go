@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CSKU-Lab/go-grader/configs"
+	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
 	configPB "github.com/CSKU-Lab/go-grader/genproto/config/v1"
@@ -72,7 +73,7 @@ func main() {
 	logger.Info("Worker is ready to start working 🤖...")
 
 	go func() {
-		err := q.Consume(ctx, "run", func(message []byte) {
+		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(message []byte) error {
 			execution := &models.RunExecution{}
 
 			err := json.Unmarshal(message, execution)
@@ -107,72 +108,76 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "run_results", bytesResult)
+			err = q.PublishToTopic(ctx, "topic.run_results", "result."+execution.ID, execution.ID, bytesResult)
 			if err != nil {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
 
 			logger.Infow("Runner finished", "result", result)
+			return nil
 		})
 		if err != nil {
 			logger.Fatalw("Cannot consume message from the queue", "error", err)
 		}
 	}()
 
-	go q.Consume(ctx, "grade", func(message []byte) {
-		execution := &models.GradeExecution{}
+	go func() {
+		q.Consume(ctx, "grade", constants.MAX_QUEUES, func(message []byte) error {
+			execution := &models.GradeExecution{}
 
-		err := json.Unmarshal(message, execution)
-		if err != nil {
-			logger.Fatalw("Cannot unmarshal message", "error", err)
-		}
-
-		task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{
-			Id: execution.TaskID,
-		})
-		if err != nil {
-			logger.Fatalw("Cannot get task from gRPC server", "error", err)
-		}
-
-		executor := executorService.NewExecutor()
-		if err := executor.SetRunner(task.GetRunnerId()); err != nil {
-			logger.Fatalw("Cannot set runner", "error", err)
-		}
-		if err := executor.SetFiles(execution.Files); err != nil {
-			logger.Fatalw("Cannot set files", "error", err)
-		}
-		executor.SetCompareID(task.GetCompareId())
-		executor.SetTestCases(func() []models.TestCase {
-			var testCases []models.TestCase
-			for _, testcase := range task.Testcases {
-				testCases = append(testCases, models.TestCase{
-					ID:     testcase.Id,
-					Input:  testcase.Input,
-					Output: testcase.Output,
-				})
+			err := json.Unmarshal(message, execution)
+			if err != nil {
+				logger.Fatalw("Cannot unmarshal message", "error", err)
 			}
-			return testCases
-		}())
 
-		result, err := executor.Grade()
-		if err != nil {
-			logger.Fatalw("Error from runner", "error", err)
-		}
+			task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{
+				Id: execution.TaskID,
+			})
+			if err != nil {
+				logger.Fatalw("Cannot get task from gRPC server", "error", err)
+			}
 
-		logger.Infow("Grading finished", "result", result)
+			executor := executorService.NewExecutor()
+			if err := executor.SetRunner(task.GetRunnerId()); err != nil {
+				logger.Fatalw("Cannot set runner", "error", err)
+			}
+			if err := executor.SetFiles(execution.Files); err != nil {
+				logger.Fatalw("Cannot set files", "error", err)
+			}
+			executor.SetCompareID(task.GetCompareId())
+			executor.SetTestCases(func() []models.TestCase {
+				var testCases []models.TestCase
+				for _, testcase := range task.Testcases {
+					testCases = append(testCases, models.TestCase{
+						ID:     testcase.Id,
+						Input:  testcase.Input,
+						Output: testcase.Output,
+					})
+				}
+				return testCases
+			}())
 
-		result.ID = execution.ID
+			result, err := executor.Grade()
+			if err != nil {
+				logger.Fatalw("Error from runner", "error", err)
+			}
 
-		bytesResult, err := json.Marshal(result)
-		if err != nil {
-			logger.Errorw("Cannot marshal grade result", "error", err)
-		}
+			logger.Infow("Grading finished", "result", result)
 
-		err = q.Publish(ctx, "grade_results", bytesResult)
-		if err != nil {
-			logger.Errorw("Cannot publish grade result to the queue", "error", err)
-		}
-	})
+			result.ID = execution.ID
+
+			bytesResult, err := json.Marshal(result)
+			if err != nil {
+				logger.Errorw("Cannot marshal grade result", "error", err)
+			}
+
+			err = q.Publish(ctx, "grade_results", bytesResult)
+			if err != nil {
+				logger.Errorw("Cannot publish grade result to the queue", "error", err)
+			}
+			return nil
+		})
+	}()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)

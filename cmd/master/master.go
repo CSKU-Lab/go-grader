@@ -17,25 +17,30 @@ import (
 	"github.com/CSKU-Lab/go-grader/domain/services"
 	pb "github.com/CSKU-Lab/go-grader/genproto/grader/v1"
 	"github.com/CSKU-Lab/go-grader/internal/adapters/sqlx"
-	"github.com/CSKU-Lab/go-grader/internal/generators"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/logging"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 func storeRunResult(ctx context.Context, logger *zap.SugaredLogger, service services.ResultService, q messaging.Queue) {
-	err := q.Consume(ctx, "run_results", func(msg []byte) {
+	err := q.Consume(ctx, "run_results", 1, func(msg []byte) error {
 		result := &models.RunResult{}
 		err := json.Unmarshal(msg, result)
 		if err != nil {
 			logger.Errorln("Cannot unmarshal run result message", "error", err)
+			return err
 		}
 		err = service.CreateRunResult(ctx, result.ID, result)
 		if err != nil {
 			logger.Errorln("Cannot store run result to the database", "error", err)
+			return err
 		}
+		return nil
 	})
 	if err != nil {
 		logger.Fatalw("Cannot consume run result messages", "error", err)
@@ -43,41 +48,22 @@ func storeRunResult(ctx context.Context, logger *zap.SugaredLogger, service serv
 }
 
 func storeGradeResult(ctx context.Context, logger *zap.SugaredLogger, service services.ResultService, q messaging.Queue) {
-	err := q.Consume(ctx, "grade_results", func(msg []byte) {
+	err := q.Consume(ctx, "grade_results", 1, func(msg []byte) error {
 		result := &models.GradeResult{}
 		err := json.Unmarshal(msg, result)
 		if err != nil {
 			logger.Errorln("Cannot unmarshal run result message", "error", err)
+			return err
 		}
 		err = service.CreateGradeResult(ctx, result.ID, result)
 		if err != nil {
 			logger.Errorln("Cannot store run result to the database", "error", err)
+			return err
 		}
+		return nil
 	})
 	if err != nil {
 		logger.Fatalw("Cannot consume run result messages", "error", err)
-	}
-}
-
-func seedQueue(logger *zap.SugaredLogger, q messaging.Queue) {
-	err := q.Declare("grade")
-	if err != nil {
-		logger.Fatalw("Cannot declare grading queue", "error", err)
-	}
-
-	err = q.Declare("run")
-	if err != nil {
-		logger.Fatalw("Cannot declare grading queue", "error", err)
-	}
-
-	err = q.Declare("run_results")
-	if err != nil {
-		logger.Fatalw("Cannot declare run_results queue", "error", err)
-	}
-
-	err = q.Declare("grade_results")
-	if err != nil {
-		logger.Fatalw("Cannot declare grade_results queue", "error", err)
 	}
 }
 
@@ -99,8 +85,6 @@ func main() {
 		logger.Fatalw("Cannot initialize RabbitMQ", "error", err)
 	}
 	defer rb.Close()
-
-	seedQueue(logger, rb)
 
 	db := configs.NewDB(logger, os.Getenv("DATABASE_URL"))
 	resultRepo := sqlx.NewSQLXInstance(db)
@@ -155,8 +139,14 @@ func newGraderGRPCServer(logger *zap.SugaredLogger, q messaging.Queue, service s
 	}
 }
 
-func (s *graderGRPCServer) Run(ctx context.Context, req *pb.RunRequest) (*pb.RunResponse, error) {
-	id := generators.UUID()
+func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingServer[pb.RunResultResponse]) error {
+	ctx := stream.Context()
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		s.logger.Fatalw("Cannot generate UUIDv7", "error", err)
+		return err
+	}
 
 	var files = make([]models.File, len(req.Files))
 	for i, file := range req.GetFiles() {
@@ -167,7 +157,7 @@ func (s *graderGRPCServer) Run(ctx context.Context, req *pb.RunRequest) (*pb.Run
 	}
 
 	execution := models.RunExecution{
-		ID:       id,
+		ID:       id.String(),
 		Files:    files,
 		Input:    req.GetInput(),
 		RunnerID: req.GetRunnerId(),
@@ -184,9 +174,32 @@ func (s *graderGRPCServer) Run(ctx context.Context, req *pb.RunRequest) (*pb.Run
 	}
 	s.logger.Info("Publish message to the queue successfully!")
 
-	return &pb.RunResponse{
-		ExecutionId: id,
-	}, nil
+	err = s.q.ConsumeFromTopic(ctx, "topic.run_results", "result."+id.String(), 1, func(msg []byte) error {
+		result := &models.RunResult{}
+		err := json.Unmarshal(msg, result)
+		if err != nil {
+			s.logger.Errorln("Cannot unmarshal run result message", "error", err)
+			return err
+		}
+
+		output := result.StdOut
+		if output == "" {
+			output = result.StdErr
+		}
+
+		return stream.Send(&pb.RunResultResponse{
+			ExecutionId: result.ID,
+			Status:      executionStatusToProtoStatus(result.Status),
+			Output:      output,
+			WallTime:    result.WallTime,
+			Memory:      result.Memory,
+		})
+	})
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	return nil
 }
 
 func (s *graderGRPCServer) GetRunResult(ctx context.Context, req *pb.GetRunResultRequest) (*pb.RunResultResponse, error) {
@@ -205,7 +218,11 @@ func (s *graderGRPCServer) GetRunResult(ctx context.Context, req *pb.GetRunResul
 }
 
 func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradedResponse, error) {
-	id := generators.UUID()
+	id, err := uuid.NewV7()
+	if err != nil {
+		s.logger.Fatalw("Cannot generate UUIDv7", "error", err)
+		return nil, err
+	}
 
 	var files = make([]models.File, len(req.Files))
 	for i, file := range req.GetFiles() {
@@ -216,7 +233,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 	}
 
 	execution := models.GradeExecution{
-		ID:     id,
+		ID:     id.String(),
 		Files:  files,
 		TaskID: req.GetTaskId(),
 	}
@@ -233,7 +250,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 	s.logger.Info("Publish message to the queue successfully!")
 
 	return &pb.GradedResponse{
-		ExecutionId: id,
+		ExecutionId: id.String(),
 	}, nil
 }
 
