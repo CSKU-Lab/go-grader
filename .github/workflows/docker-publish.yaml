@@ -2,13 +2,15 @@ name: Build and Push Docker Image
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
 
 env:
-  MASTER_IMAGE_NAME: go-grader-master
-  WORKER_IMAGE_NAME: go-grader-worker
+  MASTER_IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/go-grader-master
+  WORKER_IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/go-grader-worker
 
 jobs:
   build-and-push:
@@ -33,13 +35,21 @@ jobs:
         id: meta-master
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ env.MASTER_IMAGE_NAME }}
+          images: ${{ env.MASTER_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
 
       - name: Extract metadata for worker (tags, labels)
         id: meta-worker
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ env.WORKER_IMAGE_NAME }}
+          images: ${{ env.WORKER_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
 
       - name: Build and push master Docker image
         uses: docker/build-push-action@v6
