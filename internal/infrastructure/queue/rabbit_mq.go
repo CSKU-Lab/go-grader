@@ -40,6 +40,11 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 		return nil, err
 	}
 
+	err = ch.ExchangeDeclare("grade_results", "direct", true, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	err = ch.ExchangeDeclare("run", "direct", true, false, false, false, nil)
 	if err != nil {
 		return nil, err
@@ -50,12 +55,23 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 		return nil, err
 	}
 
+	_, err = ch.QueueDeclare("grade_results", true, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = ch.QueueDeclare("run", true, false, false, false, nil)
 	if err != nil {
 		return nil, err
 	}
 
+
 	err = ch.QueueBind("grade", "grade", "grade", false, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ch.QueueBind("grade_results", "grade_results", "grade_results", false, nil)
 	if err != nil {
 		return nil, err
 	}
