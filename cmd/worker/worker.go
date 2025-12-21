@@ -45,14 +45,30 @@ func main() {
 	taskGRPC, closeTask := initTaskServerClient(logger, env.GetTaskServerURL())
 	defer closeTask()
 
-	runnerRes, err := configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
+	var runnerRes *configPB.GetRunnersResponse
+	for i := range 5 {
+		runnerRes, err = configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
+		if err == nil {
+			break
+		}
+		logger.Warnw("Cannot get runners from gRPC server, retrying", "error", err, "attempt", i+1)
+		time.Sleep(time.Duration((2 * i)+1) * time.Second)
+	}
 	if err != nil {
-		logger.Fatalw("Cannot get runners from gRPC server", "error", err)
+		logger.Fatalw("Cannot get runners from gRPC server after retries", "error", err)
 	}
 
-	compareRes, err := configGRPC.GetCompares(ctx, &emptypb.Empty{})
+	var compareRes *configPB.GetComparesResponse
+	for i := range 5 {
+		compareRes, err = configGRPC.GetCompares(ctx, &emptypb.Empty{})
+		if err == nil {
+			break
+		}
+		logger.Warnw("Cannot get compares from gRPC server, retrying", "error", err, "attempt", i+1)
+		time.Sleep(time.Duration((2 * i)+1) * time.Second)
+	}
 	if err != nil {
-		logger.Fatalw("Cannot get compares from gRPC server", "error", err)
+		logger.Fatalw("Cannot get compares from gRPC server after retries", "error", err)
 	}
 
 	runners := runnerPbToModel(runnerRes.Runners)
