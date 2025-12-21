@@ -3,6 +3,7 @@ package setup
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path"
 	"strings"
@@ -34,20 +35,54 @@ func Cleanup(logger *zap.SugaredLogger) {
 	}
 }
 
+func isDirExists(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err == nil {
+		return info.IsDir(), nil
+	}
+
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	return false, err
+}
+
 func setupConfigDir(logger *zap.SugaredLogger) {
-	err := os.MkdirAll(constants.CONFIG_DIR, 0755)
+	isConfigDirExists, err := isDirExists(constants.CONFIG_DIR)
 	if err != nil {
-		logger.Fatalw("Cannot create config directory", "error", err)
+		logger.Fatalw("Cannot check config directory", "error", err)
 	}
 
-	err = os.Mkdir(constants.RUNNER_DIR, 0755)
-	if err != nil {
-		logger.Fatal("Cannot create runners directory")
+	if !isConfigDirExists {
+		err := os.MkdirAll(constants.CONFIG_DIR, 0755)
+		if err != nil {
+			logger.Fatalw("Cannot create config directory", "error", err)
+		}
 	}
 
-	err = os.Mkdir(constants.COMPARE_DIR, 0755)
+	isRunnerDirExists, err := isDirExists(constants.RUNNER_DIR)
 	if err != nil {
-		logger.Fatal("Cannot create compares directory")
+		logger.Fatalw("Cannot check config directory", "error", err)
+	}
+
+	if !isRunnerDirExists {
+		err = os.Mkdir(constants.RUNNER_DIR, 0755)
+		if err != nil {
+			logger.Fatalw("Cannot create runners directory", "error", err)
+		}
+	}
+
+	isCompareDirExists, err := isDirExists(constants.COMPARE_DIR)
+	if err != nil {
+		logger.Fatalw("Cannot check compare directory", "error", err)
+	}
+
+	if !isCompareDirExists {
+		err = os.Mkdir(constants.COMPARE_DIR, 0755)
+		if err != nil {
+			logger.Fatal("Cannot create compares directory")
+		}
 	}
 
 	logger.Info("Config directory is created.")
@@ -57,11 +92,19 @@ func setupRunners(logger *zap.SugaredLogger, wg *sync.WaitGroup, runners []model
 	defer wg.Done()
 
 	for _, runner := range runners {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			runnerDir := path.Join(constants.RUNNER_DIR, runner.ID)
-			err := os.Mkdir(runnerDir, 0755)
+			isRunnerDirExists, err := isDirExists(runnerDir)
+			if err != nil {
+				logger.Fatalf("[setupRunners] : Cannot check %s config directory : %s", runner.ID, err)
+			}
+
+			if isRunnerDirExists {
+				logger.Infof("%s already exists, skipping...", runner.ID)
+				return
+			}
+
+			err = os.Mkdir(runnerDir, 0755)
 			if err != nil {
 				logger.Fatalf("[setupRunners] : Cannot create %s config directory : %s", runner.ID, err)
 			}
@@ -82,7 +125,7 @@ func setupRunners(logger *zap.SugaredLogger, wg *sync.WaitGroup, runners []model
 				}
 			}
 			logger.Infof("%s setup completed ✅", runner.ID)
-		}()
+		})
 	}
 }
 
@@ -91,13 +134,22 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 
 	isolateService := services.NewIsolateService(context.Background(), logger)
 	for _, compare := range compares {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			runner := isolateService.NewInstance()
 
 			comparePath := path.Join(constants.COMPARE_DIR, compare.ID)
-			err := os.Mkdir(comparePath, 0755)
+
+			isComapreDirExists, err := isDirExists(comparePath)
+			if err != nil {
+				logger.Fatalf("[setupRunners] : Cannot check %s config directory : %s", runner.ID, err)
+			}
+
+			if isComapreDirExists {
+				logger.Infof("%s already exists, skipping...", runner.ID)
+				return
+			}
+
+			err = os.Mkdir(comparePath, 0755)
 			if err != nil {
 				logger.Fatalw("Cannot create compare directory", "error", err)
 			}
@@ -133,7 +185,7 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 			logger.Infof("Write %s to compares.json", compare.ID)
 
 			logger.Infof("%s setup completed ✅", compare.ID)
-		}()
+		})
 	}
 
 	writeToComparesJson(compares)
