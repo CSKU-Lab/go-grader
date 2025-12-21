@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -26,26 +27,6 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
-
-func storeRunResult(ctx context.Context, logger *zap.SugaredLogger, service services.ResultService, q messaging.Queue) {
-	err := q.Consume(ctx, "run_results", 1, func(msg []byte) error {
-		result := &models.RunResult{}
-		err := json.Unmarshal(msg, result)
-		if err != nil {
-			logger.Errorln("Cannot unmarshal run result message", "error", err)
-			return err
-		}
-		err = service.CreateRunResult(ctx, result.ID, result)
-		if err != nil {
-			logger.Errorln("Cannot store run result to the database", "error", err)
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		logger.Fatalw("Cannot consume run result messages", "error", err)
-	}
-}
 
 func storeGradeResult(ctx context.Context, logger *zap.SugaredLogger, service services.ResultService, q messaging.Queue) {
 	err := q.Consume(ctx, "grade_results", 1, func(msg []byte) error {
@@ -90,7 +71,6 @@ func main() {
 	resultRepo := sqlx.NewSQLXInstance(db)
 	resultService := services.NewResultService(resultRepo)
 
-	go storeRunResult(context.Background(), logger, resultService, rb)
 	go storeGradeResult(context.Background(), logger, resultService, rb)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", env.GetPort()))
@@ -107,7 +87,9 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
+	var wg sync.WaitGroup
+
+	wg.Go(func() {
 		sig := <-sigs
 		logger.Info("Receive %s signal from OS, going to shutdown...\n", sig)
 		timer := time.AfterFunc(10*time.Second, func() {
@@ -117,11 +99,13 @@ func main() {
 		defer timer.Stop()
 		s.GracefulStop()
 		logger.Infoln("Successfully gracefully shutdown the server :D")
-	}()
+	})
 
 	if err := s.Serve(lis); err != nil {
 		logger.Fatalln("Cannot start grpc server :", err)
 	}
+
+	wg.Wait()
 }
 
 type graderGRPCServer struct {
