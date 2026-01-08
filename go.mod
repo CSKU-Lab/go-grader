@@ -21,5 +21,6 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/rabbitmq/amqp091-go v1.10.0
+	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.29.0 // indirect
 )

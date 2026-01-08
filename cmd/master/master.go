@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
@@ -277,6 +280,84 @@ func (s *graderGRPCServer) GetGradeResult(ctx context.Context, req *pb.GetGradeR
 		AvgMemory:       result.AvgMemory,
 		TestCaseResults: testCaseResults,
 	}, nil
+}
+
+func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.GenerateTestCasesRequest) (*pb.GenerateTestCasesResponse, error) {
+	var files = make([]models.File, len(req.Files))
+	for i, file := range req.GetFiles() {
+		files[i] = models.File{
+			Name:    file.GetName(),
+			Content: file.GetContent(),
+		}
+	}
+
+	runResults := make([]*pb.RunResultResponse, 0, len(req.GetInputs()))
+
+	var eg errgroup.Group
+	for _, input := range req.GetInputs() {
+		eg.Go(func() error {
+			id, err := uuid.NewV7()
+			if err != nil {
+				return errors.New("Cannot generate UUIDv7")
+			}
+
+			payload := models.RunExecution{
+				ID:       id.String(),
+				Files:    files,
+				Input:    input,
+				RunnerID: req.GetRunnerId(),
+			}
+
+			message, err := json.Marshal(&payload)
+			if err != nil {
+				return errors.New("Cannot parse execution struct to json")
+			}
+
+			err = s.q.Publish(ctx, "run", message)
+			if err != nil {
+				return errors.New("Cannot publish message to the execution queue")
+			}
+			s.logger.Info("Publish message to the queue successfully!")
+
+			return s.q.ConsumeFromTopic(ctx, "topic.run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
+				result := &models.RunResult{}
+				err := json.Unmarshal(msg, result)
+				if err != nil {
+					return errors.New("Cannot unmarshal run result message")
+				}
+				s.logger.Infof("Received run result for execution ID %s with status %s", result.ID, result.Status)
+
+				if result.Status != execution.QUEUED && result.Status != execution.RUNNING {
+					exit <- struct{}{}
+				}
+
+				output := result.StdOut
+				if output == "" {
+					output = result.StdErr
+				}
+
+				runResults = append(runResults, &pb.RunResultResponse{
+					ExecutionId: result.ID,
+					Status:      executionStatusToProtoStatus(result.Status),
+					Output:      output,
+					WallTime:    result.WallTime,
+					Memory:      result.Memory,
+				})
+
+				return nil
+			})
+		})
+	}
+
+	err := eg.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.GenerateTestCasesResponse{
+		RunResults: runResults,
+	}, nil
+
 }
 
 func executionStatusToProtoStatus(status execution.Status) pb.ExecutionStatus {

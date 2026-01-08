@@ -42,8 +42,8 @@ func main() {
 	configGRPC, closeConfig := initConfigServerClient(logger, env.GetConfigServerURL())
 	defer closeConfig()
 
-	taskGRPC, closeTask := initTaskServerClient(logger, env.GetTaskServerURL())
-	defer closeTask()
+	// taskGRPC, closeTask := initTaskServerClient(logger, env.GetTaskServerURL())
+	// defer closeTask()
 
 	var runnerRes *configPB.GetRunnersResponse
 	for i := range 5 {
@@ -52,7 +52,7 @@ func main() {
 			break
 		}
 		logger.Warnw("Cannot get runners from gRPC server, retrying", "error", err, "attempt", i+1)
-		time.Sleep(time.Duration((2 * i)+1) * time.Second)
+		time.Sleep(time.Duration((2*i)+1) * time.Second)
 	}
 	if err != nil {
 		logger.Fatalw("Cannot get runners from gRPC server after retries", "error", err)
@@ -65,7 +65,7 @@ func main() {
 			break
 		}
 		logger.Warnw("Cannot get compares from gRPC server, retrying", "error", err, "attempt", i+1)
-		time.Sleep(time.Duration((2 * i)+1) * time.Second)
+		time.Sleep(time.Duration((2*i)+1) * time.Second)
 	}
 	if err != nil {
 		logger.Fatalw("Cannot get compares from gRPC server after retries", "error", err)
@@ -153,59 +153,60 @@ func main() {
 
 	go func() {
 		q.Consume(ctx, "grade", constants.MAX_QUEUES, func(message []byte) error {
-			execution := &models.GradeExecution{}
-
-			err := json.Unmarshal(message, execution)
-			if err != nil {
-				logger.Fatalw("Cannot unmarshal message", "error", err)
-			}
-
-			task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{
-				Id: execution.TaskID,
-			})
-			if err != nil {
-				logger.Fatalw("Cannot get task from gRPC server", "error", err)
-			}
-
-			executor := executorService.NewExecutor()
-			if err := executor.SetRunner(task.GetRunnerId()); err != nil {
-				logger.Fatalw("Cannot set runner", "error", err)
-			}
-			if err := executor.SetFiles(execution.Files); err != nil {
-				logger.Fatalw("Cannot set files", "error", err)
-			}
-			executor.SetCompareID(task.GetCompareId())
-			executor.SetTestCases(func() []models.TestCase {
-				var testCases []models.TestCase
-				for _, testcase := range task.Testcases {
-					testCases = append(testCases, models.TestCase{
-						ID:     testcase.Id,
-						Input:  testcase.Input,
-						Output: testcase.Output,
-					})
-				}
-				return testCases
-			}())
-
-			result, err := executor.Grade()
-			if err != nil {
-				logger.Fatalw("Error from runner", "error", err)
-			}
-
-			logger.Infow("Grading finished", "result", result)
-
-			result.ID = execution.ID
-
-			bytesResult, err := json.Marshal(result)
-			if err != nil {
-				logger.Errorw("Cannot marshal grade result", "error", err)
-			}
-
-			err = q.Publish(ctx, "grade_results", bytesResult)
-			if err != nil {
-				logger.Errorw("Cannot publish grade result to the queue", "error", err)
-			}
 			return nil
+			// execution := &models.GradeExecution{}
+			//
+			// err := json.Unmarshal(message, execution)
+			// if err != nil {
+			// 	logger.Fatalw("Cannot unmarshal message", "error", err)
+			// }
+			//
+			// task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{
+			// 	Id: execution.TaskID,
+			// })
+			// if err != nil {
+			// 	logger.Fatalw("Cannot get task from gRPC server", "error", err)
+			// }
+			//
+			// executor := executorService.NewExecutor()
+			// if err := executor.SetRunner(task.GetRunnerId()); err != nil {
+			// 	logger.Fatalw("Cannot set runner", "error", err)
+			// }
+			// if err := executor.SetFiles(execution.Files); err != nil {
+			// 	logger.Fatalw("Cannot set files", "error", err)
+			// }
+			// executor.SetCompareID(task.GetCompareId())
+			// executor.SetTestCases(func() []models.TestCase {
+			// 	var testCases []models.TestCase
+			// 	for _, testcase := range task.Testcases {
+			// 		testCases = append(testCases, models.TestCase{
+			// 			ID:     testcase.Id,
+			// 			Input:  testcase.Input,
+			// 			Output: testcase.Output,
+			// 		})
+			// 	}
+			// 	return testCases
+			// }())
+			//
+			// result, err := executor.Grade()
+			// if err != nil {
+			// 	logger.Fatalw("Error from runner", "error", err)
+			// }
+			//
+			// logger.Infow("Grading finished", "result", result)
+			//
+			// result.ID = execution.ID
+			//
+			// bytesResult, err := json.Marshal(result)
+			// if err != nil {
+			// 	logger.Errorw("Cannot marshal grade result", "error", err)
+			// }
+			//
+			// err = q.Publish(ctx, "grade_results", bytesResult)
+			// if err != nil {
+			// 	logger.Errorw("Cannot publish grade result to the queue", "error", err)
+			// }
+			// return nil
 		})
 	}()
 
