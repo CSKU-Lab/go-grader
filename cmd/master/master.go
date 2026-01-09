@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"slices"
 	"sync"
 	"syscall"
 	"time"
@@ -291,10 +292,11 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 		}
 	}
 
-	runResults := make([]*pb.RunResultResponse, 0, len(req.GetInputs()))
+	runResults := make([]*pb.TestCaseResponse, 0, len(req.GetTestcases()))
+	var mu sync.Mutex
 
 	var eg errgroup.Group
-	for _, input := range req.GetInputs() {
+	for _, testcase := range req.GetTestcases() {
 		eg.Go(func() error {
 			id, err := uuid.NewV7()
 			if err != nil {
@@ -304,7 +306,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 			payload := models.RunExecution{
 				ID:       id.String(),
 				Files:    files,
-				Input:    input,
+				Input:    testcase.GetInput(),
 				RunnerID: req.GetRunnerId(),
 			}
 
@@ -336,12 +338,13 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 					output = result.StdErr
 				}
 
-				runResults = append(runResults, &pb.RunResultResponse{
-					ExecutionId: result.ID,
-					Status:      executionStatusToProtoStatus(result.Status),
-					Output:      output,
-					WallTime:    result.WallTime,
-					Memory:      result.Memory,
+				mu.Lock()
+				defer mu.Unlock()
+
+				runResults = append(runResults, &pb.TestCaseResponse{
+					Order:  testcase.GetOrder(),
+					Input:  testcase.GetInput(),
+					Output: output,
 				})
 
 				return nil
@@ -354,10 +357,13 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	return &pb.GenerateTestCasesResponse{
-		RunResults: runResults,
-	}, nil
+	slices.SortFunc(runResults, func(a, b *pb.TestCaseResponse) int {
+		return int(a.Order - b.Order)
+	})
 
+	return &pb.GenerateTestCasesResponse{
+		Results: runResults,
+	}, nil
 }
 
 func executionStatusToProtoStatus(status execution.Status) pb.ExecutionStatus {
