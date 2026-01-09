@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -89,28 +90,35 @@ func main() {
 
 	logger.Info("Worker is ready to start working 🤖...")
 
-	go func() {
+	var wg sync.WaitGroup
+
+	wg.Go(func() {
+		defer wg.Done()
 		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(message []byte) error {
 			payload := &models.RunExecution{}
 
 			err := json.Unmarshal(message, payload)
 			if err != nil {
-				logger.Fatalw("Cannot unmarshal message", "error", err)
+				logger.Errorw("Cannot unmarshal message", "error", err)
+				return err
 			}
 
 			executor := executorService.NewExecutor()
 			defer executor.Cleanup()
 
 			if err := executor.SetRunner(payload.RunnerID); err != nil {
-				logger.Fatalw("Cannot set runner", "error", err)
+				logger.Errorw("Cannot set runner", "error", err)
+				return err
 			}
 
 			if err := executor.SetFiles(payload.Files); err != nil {
-				logger.Fatalw("Cannot set files", "error", err)
+				logger.Errorw("Cannot set files", "error", err)
+				return err
 			}
 
 			if err := executor.SetInput(payload.Input); err != nil {
-				logger.Fatalw("Cannot set input", "error", err)
+				logger.Errorw("Cannot set input", "error", err)
+				return err
 			}
 
 			bytesResult, err := json.Marshal(models.RunResult{
@@ -128,7 +136,8 @@ func main() {
 
 			result, err := executor.Run()
 			if err != nil {
-				logger.Fatalw("Error from runner", "error", err)
+				logger.Errorw("Error from runner", "error", err)
+				return err
 			}
 
 			result.ID = payload.ID
@@ -147,68 +156,9 @@ func main() {
 			return nil
 		})
 		if err != nil {
-			logger.Fatalw("Cannot consume message from the queue", "error", err)
+			logger.Errorw("Cannot consume message from the run queue", "error", err)
 		}
-	}()
-
-	go func() {
-		q.Consume(ctx, "grade", constants.MAX_QUEUES, func(message []byte) error {
-			return nil
-			// execution := &models.GradeExecution{}
-			//
-			// err := json.Unmarshal(message, execution)
-			// if err != nil {
-			// 	logger.Fatalw("Cannot unmarshal message", "error", err)
-			// }
-			//
-			// task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{
-			// 	Id: execution.TaskID,
-			// })
-			// if err != nil {
-			// 	logger.Fatalw("Cannot get task from gRPC server", "error", err)
-			// }
-			//
-			// executor := executorService.NewExecutor()
-			// if err := executor.SetRunner(task.GetRunnerId()); err != nil {
-			// 	logger.Fatalw("Cannot set runner", "error", err)
-			// }
-			// if err := executor.SetFiles(execution.Files); err != nil {
-			// 	logger.Fatalw("Cannot set files", "error", err)
-			// }
-			// executor.SetCompareID(task.GetCompareId())
-			// executor.SetTestCases(func() []models.TestCase {
-			// 	var testCases []models.TestCase
-			// 	for _, testcase := range task.Testcases {
-			// 		testCases = append(testCases, models.TestCase{
-			// 			ID:     testcase.Id,
-			// 			Input:  testcase.Input,
-			// 			Output: testcase.Output,
-			// 		})
-			// 	}
-			// 	return testCases
-			// }())
-			//
-			// result, err := executor.Grade()
-			// if err != nil {
-			// 	logger.Fatalw("Error from runner", "error", err)
-			// }
-			//
-			// logger.Infow("Grading finished", "result", result)
-			//
-			// result.ID = execution.ID
-			//
-			// bytesResult, err := json.Marshal(result)
-			// if err != nil {
-			// 	logger.Errorw("Cannot marshal grade result", "error", err)
-			// }
-			//
-			// err = q.Publish(ctx, "grade_results", bytesResult)
-			// if err != nil {
-			// 	logger.Errorw("Cannot publish grade result to the queue", "error", err)
-			// }
-			// return nil
-		})
-	}()
+	})
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -220,6 +170,8 @@ func main() {
 	})
 	defer timer.Stop()
 	cancel()
+
+	wg.Wait()
 
 	q.Close()
 	logger.Info("RabbitMQ connection is closed.")
