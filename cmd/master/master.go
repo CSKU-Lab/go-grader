@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -48,7 +47,7 @@ func storeGradeResult(ctx context.Context, logger *zap.SugaredLogger, service se
 		return nil
 	})
 	if err != nil {
-		logger.Fatalw("Cannot consume run result messages", "error", err)
+		logger.Errorw("Cannot consume run result messages, retrying...", "error", err)
 	}
 }
 
@@ -132,8 +131,8 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 
 	id, err := uuid.NewV7()
 	if err != nil {
-		s.logger.Fatalw("Cannot generate UUIDv7", "error", err)
-		return err
+		s.logger.Errorw("Cannot generate UUIDv7", "error", err)
+		return status.Error(codes.Internal, "failed to generate execution ID")
 	}
 
 	var files = make([]models.File, len(req.Files))
@@ -153,12 +152,14 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 
 	message, err := json.Marshal(&payload)
 	if err != nil {
-		s.logger.Fatalw("Cannot parse execution struct to json", "error", err)
+		s.logger.Errorw("Cannot parse execution struct to json", "error", err)
+		return status.Error(codes.Internal, "failed to marshal execution payload")
 	}
 
 	err = s.q.Publish(ctx, "run", message)
 	if err != nil {
-		s.logger.Fatalw("Cannot publish message to the execution queue", "error", err)
+		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
+		return status.Error(codes.Internal, "failed to queue execution")
 	}
 	s.logger.Info("Publish message to the queue successfully!")
 
@@ -222,8 +223,8 @@ func (s *graderGRPCServer) GetRunResult(ctx context.Context, req *pb.GetRunResul
 func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradedResponse, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
-		s.logger.Fatalw("Cannot generate UUIDv7", "error", err)
-		return nil, err
+		s.logger.Errorw("Cannot generate UUIDv7", "error", err)
+		return nil, status.Error(codes.Internal, "failed to generate execution ID")
 	}
 
 	var files = make([]models.File, len(req.Files))
@@ -242,12 +243,14 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 
 	message, err := json.Marshal(&execution)
 	if err != nil {
-		s.logger.Fatalw("Cannot parse execution struct to json", "error", err)
+		s.logger.Errorw("Cannot parse execution struct to json", "error", err)
+		return nil, status.Error(codes.Internal, "failed to marshal execution payload")
 	}
 
 	err = s.q.Publish(ctx, "grade", message)
 	if err != nil {
-		s.logger.Fatalw("Cannot publish message to the execution queue", "error", err)
+		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
+		return nil, status.Error(codes.Internal, "failed to queue execution")
 	}
 	s.logger.Info("Publish message to the queue successfully!")
 
@@ -300,7 +303,8 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 		eg.Go(func() error {
 			id, err := uuid.NewV7()
 			if err != nil {
-				return errors.New("Cannot generate UUIDv7")
+				s.logger.Errorw("Cannot generate UUIDv7", "error", err)
+				return status.Error(codes.Internal, "failed to generate execution ID")
 			}
 
 			payload := models.RunExecution{
@@ -312,12 +316,14 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 
 			message, err := json.Marshal(&payload)
 			if err != nil {
-				return errors.New("Cannot parse execution struct to json")
+				s.logger.Errorw("Cannot parse execution struct to json", "error", err)
+				return status.Error(codes.Internal, "failed to marshal execution payload")
 			}
 
 			err = s.q.Publish(ctx, "run", message)
 			if err != nil {
-				return errors.New("Cannot publish message to the execution queue")
+				s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
+				return status.Error(codes.Internal, "failed to queue execution")
 			}
 			s.logger.Info("Publish message to the queue successfully!")
 
@@ -325,7 +331,8 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				result := &models.RunResult{}
 				err := json.Unmarshal(msg, result)
 				if err != nil {
-					return errors.New("Cannot unmarshal run result message")
+					s.logger.Errorln("Cannot unmarshal run result message", "error", err)
+					return err
 				}
 				s.logger.Infof("Received run result for execution ID %s with status %s", result.ID, result.Status)
 
@@ -354,6 +361,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 
 	err := eg.Wait()
 	if err != nil {
+		s.logger.Errorw("Error during test case generation", "error", err)
 		return nil, err
 	}
 
