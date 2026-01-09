@@ -65,7 +65,6 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 		return nil, err
 	}
 
-
 	err = ch.QueueBind("grade", "grade", "grade", false, nil)
 	if err != nil {
 		return nil, err
@@ -174,8 +173,17 @@ func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key strin
 	}
 
 	exitChan := make(chan struct{}, 1)
+	consumerTag, err := r.ch.Consume(q.Name, "", true, true, false, false, nil)
+	if err != nil {
+		return err
+	}
 
-	msgs, err := r.ch.Consume(q.Name, "", true, true, false, false, nil)
+	defer func() {
+		close(exitChan)
+		r.ch.Cancel(q.Name, false)
+		r.ch.QueueDelete(q.Name, false, false, false)
+	}()
+
 	for {
 		select {
 		case <-exitChan:
@@ -184,7 +192,7 @@ func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key strin
 		case <-ctx.Done():
 			r.logger.Errorln("Context has been doned", ctx.Err())
 			return ctx.Err()
-		case msg, ok := <-msgs:
+		case msg, ok := <-consumerTag:
 			if !ok {
 				r.logger.Infoln("Message channel closed, stopping consuming messages from the queue")
 				return nil
