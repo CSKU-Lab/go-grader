@@ -246,7 +246,7 @@ func (i *IsolateInstance) GetCompareResult() (string, error) {
 
 func getLimitArgs(limit *models.Limit) []string {
 	if limit == nil {
-		return []string{}
+		return nil
 	}
 
 	v := reflect.ValueOf(limit).Elem()

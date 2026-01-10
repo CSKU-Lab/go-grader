@@ -143,11 +143,27 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		}
 	}
 
+	var limit *models.Limit
+	if req.GetLimit() != nil {
+		l := req.GetLimit()
+		limit = &models.Limit{
+			CPUTime:      l.GetCpuTime(),
+			CPUExtraTime: l.GetCpuExtraTime(),
+			WallTime:     l.GetWallTime(),
+			Memory:       l.GetMemory(),
+			Stack:        int(l.GetStack()),
+			MaxOpenFiles: int(l.GetMaxOpenFiles()),
+			MaxFileSize:  l.GetMaxFileSize(),
+			NetworkAllow: l.GetNetworkAllow(),
+		}
+	}
+
 	payload := models.RunExecution{
 		ID:       id.String(),
 		Files:    files,
 		Input:    req.GetInput(),
 		RunnerID: req.GetRunnerId(),
+		Limit:    limit,
 	}
 
 	message, err := json.Marshal(&payload)
@@ -295,6 +311,21 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 		}
 	}
 
+	var limit *models.Limit
+	if req.GetLimit() != nil {
+		l := req.GetLimit()
+		limit = &models.Limit{
+			CPUTime:      l.GetCpuTime(),
+			CPUExtraTime: l.GetCpuExtraTime(),
+			WallTime:     l.GetWallTime(),
+			Memory:       l.GetMemory(),
+			Stack:        int(l.GetStack()),
+			MaxOpenFiles: int(l.GetMaxOpenFiles()),
+			MaxFileSize:  l.GetMaxFileSize(),
+			NetworkAllow: l.GetNetworkAllow(),
+		}
+	}
+
 	runResults := make([]*pb.TestCaseResponse, 0, len(req.GetTestcases()))
 	var mu sync.Mutex
 
@@ -312,6 +343,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				Files:    files,
 				Input:    testcase.GetInput(),
 				RunnerID: req.GetRunnerId(),
+				Limit:    limit,
 			}
 
 			message, err := json.Marshal(&payload)

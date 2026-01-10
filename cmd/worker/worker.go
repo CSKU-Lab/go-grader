@@ -121,6 +121,10 @@ func main() {
 				return err
 			}
 
+			if payload.Limit != nil {
+				executor.SetLimits(payload.Limit)
+			}
+
 			bytesResult, err := json.Marshal(models.RunResult{
 				ID:     payload.ID,
 				Status: execution.RUNNING,
