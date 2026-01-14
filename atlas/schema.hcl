@@ -17,33 +17,6 @@ enum "execution_status" {
   ]
 }
 
-table "run_results" {
-  schema = schema.public
-  column "id" {
-    type = uuid
-  }
-
-  column "status" {
-    type = enum.execution_status
-  }
-
-  column "output" {
-    type = text
-  }
-
-  column "wall_time" {
-    type = float
-  }
-
-  column "memory" {
-    type = int
-  }
-
-  primary_key {
-    columns = [ column.id ]
-  }
-}
-
 table "grade_results" {
   schema = schema.public
   column "id" {
