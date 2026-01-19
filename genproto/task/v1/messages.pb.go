@@ -111,9 +111,11 @@ func (x *GetTasksRequest) GetIncludeSolution() bool {
 
 type TestCase struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Order         int32                  `protobuf:"varint,1,opt,name=order,proto3" json:"order,omitempty"`
-	Input         string                 `protobuf:"bytes,2,opt,name=input,proto3" json:"input,omitempty"`
-	Output        string                 `protobuf:"bytes,3,opt,name=output,proto3" json:"output,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Order         int32                  `protobuf:"varint,2,opt,name=order,proto3" json:"order,omitempty"`
+	Input         string                 `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	Output        string                 `protobuf:"bytes,4,opt,name=output,proto3" json:"output,omitempty"`
+	IsHidden      bool                   `protobuf:"varint,5,opt,name=is_hidden,json=isHidden,proto3" json:"is_hidden,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,6 +150,13 @@ func (*TestCase) Descriptor() ([]byte, []int) {
 	return file_task_v1_messages_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *TestCase) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 func (x *TestCase) GetOrder() int32 {
 	if x != nil {
 		return x.Order
@@ -169,21 +178,105 @@ func (x *TestCase) GetOutput() string {
 	return ""
 }
 
+func (x *TestCase) GetIsHidden() bool {
+	if x != nil {
+		return x.IsHidden
+	}
+	return false
+}
+
+type TestCaseGroup struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Score         int32                  `protobuf:"varint,3,opt,name=score,proto3" json:"score,omitempty"`
+	Order         int32                  `protobuf:"varint,4,opt,name=order,proto3" json:"order,omitempty"`
+	TestCases     []*TestCase            `protobuf:"bytes,5,rep,name=test_cases,json=testCases,proto3" json:"test_cases,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestCaseGroup) Reset() {
+	*x = TestCaseGroup{}
+	mi := &file_task_v1_messages_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestCaseGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestCaseGroup) ProtoMessage() {}
+
+func (x *TestCaseGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_task_v1_messages_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestCaseGroup.ProtoReflect.Descriptor instead.
+func (*TestCaseGroup) Descriptor() ([]byte, []int) {
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TestCaseGroup) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *TestCaseGroup) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TestCaseGroup) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *TestCaseGroup) GetOrder() int32 {
+	if x != nil {
+		return x.Order
+	}
+	return 0
+}
+
+func (x *TestCaseGroup) GetTestCases() []*TestCase {
+	if x != nil {
+		return x.TestCases
+	}
+	return nil
+}
+
 type TaskResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Solution         string                 `protobuf:"bytes,2,opt,name=solution,proto3" json:"solution,omitempty"`
-	Testcases        []*TestCase            `protobuf:"bytes,3,rep,name=testcases,proto3" json:"testcases,omitempty"`
+	SolutionFiles    []*SolutionFile        `protobuf:"bytes,2,rep,name=solution_files,json=solutionFiles,proto3" json:"solution_files,omitempty"`
+	TestCaseGroups   []*TestCaseGroup       `protobuf:"bytes,3,rep,name=test_case_groups,json=testCaseGroups,proto3" json:"test_case_groups,omitempty"`
 	AllowedRunnerIds []string               `protobuf:"bytes,4,rep,name=allowed_runner_ids,json=allowedRunnerIds,proto3" json:"allowed_runner_ids,omitempty"`
-	CompareScriptId  string                 `protobuf:"bytes,5,opt,name=compare_script_id,json=compareScriptId,proto3" json:"compare_script_id,omitempty"`
+	CompareScriptId  *string                `protobuf:"bytes,5,opt,name=compare_script_id,json=compareScriptId,proto3,oneof" json:"compare_script_id,omitempty"`
 	Limit            *Limit                 `protobuf:"bytes,6,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	SolutionRunnerId *string                `protobuf:"bytes,7,opt,name=solution_runner_id,json=solutionRunnerId,proto3,oneof" json:"solution_runner_id,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *TaskResponse) Reset() {
 	*x = TaskResponse{}
-	mi := &file_task_v1_messages_proto_msgTypes[3]
+	mi := &file_task_v1_messages_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -195,7 +288,7 @@ func (x *TaskResponse) String() string {
 func (*TaskResponse) ProtoMessage() {}
 
 func (x *TaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_task_v1_messages_proto_msgTypes[3]
+	mi := &file_task_v1_messages_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -208,7 +301,7 @@ func (x *TaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskResponse.ProtoReflect.Descriptor instead.
 func (*TaskResponse) Descriptor() ([]byte, []int) {
-	return file_task_v1_messages_proto_rawDescGZIP(), []int{3}
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TaskResponse) GetId() string {
@@ -218,16 +311,16 @@ func (x *TaskResponse) GetId() string {
 	return ""
 }
 
-func (x *TaskResponse) GetSolution() string {
+func (x *TaskResponse) GetSolutionFiles() []*SolutionFile {
 	if x != nil {
-		return x.Solution
+		return x.SolutionFiles
 	}
-	return ""
+	return nil
 }
 
-func (x *TaskResponse) GetTestcases() []*TestCase {
+func (x *TaskResponse) GetTestCaseGroups() []*TestCaseGroup {
 	if x != nil {
-		return x.Testcases
+		return x.TestCaseGroups
 	}
 	return nil
 }
@@ -240,8 +333,8 @@ func (x *TaskResponse) GetAllowedRunnerIds() []string {
 }
 
 func (x *TaskResponse) GetCompareScriptId() string {
-	if x != nil {
-		return x.CompareScriptId
+	if x != nil && x.CompareScriptId != nil {
+		return *x.CompareScriptId
 	}
 	return ""
 }
@@ -253,6 +346,13 @@ func (x *TaskResponse) GetLimit() *Limit {
 	return nil
 }
 
+func (x *TaskResponse) GetSolutionRunnerId() string {
+	if x != nil && x.SolutionRunnerId != nil {
+		return *x.SolutionRunnerId
+	}
+	return ""
+}
+
 type GetTasksResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tasks         []*TaskResponse        `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
@@ -262,7 +362,7 @@ type GetTasksResponse struct {
 
 func (x *GetTasksResponse) Reset() {
 	*x = GetTasksResponse{}
-	mi := &file_task_v1_messages_proto_msgTypes[4]
+	mi := &file_task_v1_messages_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -274,7 +374,7 @@ func (x *GetTasksResponse) String() string {
 func (*GetTasksResponse) ProtoMessage() {}
 
 func (x *GetTasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_task_v1_messages_proto_msgTypes[4]
+	mi := &file_task_v1_messages_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -287,7 +387,7 @@ func (x *GetTasksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTasksResponse.ProtoReflect.Descriptor instead.
 func (*GetTasksResponse) Descriptor() ([]byte, []int) {
-	return file_task_v1_messages_proto_rawDescGZIP(), []int{4}
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetTasksResponse) GetTasks() []*TaskResponse {
@@ -313,7 +413,7 @@ type Limit struct {
 
 func (x *Limit) Reset() {
 	*x = Limit{}
-	mi := &file_task_v1_messages_proto_msgTypes[5]
+	mi := &file_task_v1_messages_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -325,7 +425,7 @@ func (x *Limit) String() string {
 func (*Limit) ProtoMessage() {}
 
 func (x *Limit) ProtoReflect() protoreflect.Message {
-	mi := &file_task_v1_messages_proto_msgTypes[5]
+	mi := &file_task_v1_messages_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -338,7 +438,7 @@ func (x *Limit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Limit.ProtoReflect.Descriptor instead.
 func (*Limit) Descriptor() ([]byte, []int) {
-	return file_task_v1_messages_proto_rawDescGZIP(), []int{5}
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Limit) GetCpuTime() float32 {
@@ -397,33 +497,29 @@ func (x *Limit) GetNetworkAllow() bool {
 	return false
 }
 
-type UpsertTaskRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               *string                `protobuf:"bytes,1,opt,name=id,proto3,oneof" json:"id,omitempty"`
-	Solution         *string                `protobuf:"bytes,2,opt,name=solution,proto3,oneof" json:"solution,omitempty"`
-	Testcases        []*TestCase            `protobuf:"bytes,3,rep,name=testcases,proto3" json:"testcases,omitempty"`
-	AllowedRunnerIds []string               `protobuf:"bytes,4,rep,name=allowed_runner_ids,json=allowedRunnerIds,proto3" json:"allowed_runner_ids,omitempty"`
-	CompareId        *string                `protobuf:"bytes,5,opt,name=compare_id,json=compareId,proto3,oneof" json:"compare_id,omitempty"`
-	Limit            *Limit                 `protobuf:"bytes,6,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+type SolutionFile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UpsertTaskRequest) Reset() {
-	*x = UpsertTaskRequest{}
-	mi := &file_task_v1_messages_proto_msgTypes[6]
+func (x *SolutionFile) Reset() {
+	*x = SolutionFile{}
+	mi := &file_task_v1_messages_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UpsertTaskRequest) String() string {
+func (x *SolutionFile) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UpsertTaskRequest) ProtoMessage() {}
+func (*SolutionFile) ProtoMessage() {}
 
-func (x *UpsertTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_task_v1_messages_proto_msgTypes[6]
+func (x *SolutionFile) ProtoReflect() protoreflect.Message {
+	mi := &file_task_v1_messages_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -434,93 +530,113 @@ func (x *UpsertTaskRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UpsertTaskRequest.ProtoReflect.Descriptor instead.
-func (*UpsertTaskRequest) Descriptor() ([]byte, []int) {
-	return file_task_v1_messages_proto_rawDescGZIP(), []int{6}
+// Deprecated: Use SolutionFile.ProtoReflect.Descriptor instead.
+func (*SolutionFile) Descriptor() ([]byte, []int) {
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *UpsertTaskRequest) GetId() string {
+func (x *SolutionFile) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SolutionFile) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type UpdateTaskRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               *string                `protobuf:"bytes,1,opt,name=id,proto3,oneof" json:"id,omitempty"`
+	SolutionFiles    []*SolutionFile        `protobuf:"bytes,2,rep,name=solution_files,json=solutionFiles,proto3" json:"solution_files,omitempty"`
+	TestCaseGroups   []*TestCaseGroup       `protobuf:"bytes,3,rep,name=test_case_groups,json=testCaseGroups,proto3" json:"test_case_groups,omitempty"`
+	AllowedRunnerIds []string               `protobuf:"bytes,4,rep,name=allowed_runner_ids,json=allowedRunnerIds,proto3" json:"allowed_runner_ids,omitempty"`
+	CompareScriptId  *string                `protobuf:"bytes,5,opt,name=compare_script_id,json=compareScriptId,proto3,oneof" json:"compare_script_id,omitempty"`
+	Limit            *Limit                 `protobuf:"bytes,6,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	SolutionRunnerId *string                `protobuf:"bytes,7,opt,name=solution_runner_id,json=solutionRunnerId,proto3,oneof" json:"solution_runner_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UpdateTaskRequest) Reset() {
+	*x = UpdateTaskRequest{}
+	mi := &file_task_v1_messages_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTaskRequest) ProtoMessage() {}
+
+func (x *UpdateTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_task_v1_messages_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTaskRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTaskRequest) Descriptor() ([]byte, []int) {
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateTaskRequest) GetId() string {
 	if x != nil && x.Id != nil {
 		return *x.Id
 	}
 	return ""
 }
 
-func (x *UpsertTaskRequest) GetSolution() string {
-	if x != nil && x.Solution != nil {
-		return *x.Solution
-	}
-	return ""
-}
-
-func (x *UpsertTaskRequest) GetTestcases() []*TestCase {
+func (x *UpdateTaskRequest) GetSolutionFiles() []*SolutionFile {
 	if x != nil {
-		return x.Testcases
+		return x.SolutionFiles
 	}
 	return nil
 }
 
-func (x *UpsertTaskRequest) GetAllowedRunnerIds() []string {
+func (x *UpdateTaskRequest) GetTestCaseGroups() []*TestCaseGroup {
+	if x != nil {
+		return x.TestCaseGroups
+	}
+	return nil
+}
+
+func (x *UpdateTaskRequest) GetAllowedRunnerIds() []string {
 	if x != nil {
 		return x.AllowedRunnerIds
 	}
 	return nil
 }
 
-func (x *UpsertTaskRequest) GetCompareId() string {
-	if x != nil && x.CompareId != nil {
-		return *x.CompareId
+func (x *UpdateTaskRequest) GetCompareScriptId() string {
+	if x != nil && x.CompareScriptId != nil {
+		return *x.CompareScriptId
 	}
 	return ""
 }
 
-func (x *UpsertTaskRequest) GetLimit() *Limit {
+func (x *UpdateTaskRequest) GetLimit() *Limit {
 	if x != nil {
 		return x.Limit
 	}
 	return nil
 }
 
-type UpsertTaskResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpsertTaskResponse) Reset() {
-	*x = UpsertTaskResponse{}
-	mi := &file_task_v1_messages_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpsertTaskResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpsertTaskResponse) ProtoMessage() {}
-
-func (x *UpsertTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_task_v1_messages_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpsertTaskResponse.ProtoReflect.Descriptor instead.
-func (*UpsertTaskResponse) Descriptor() ([]byte, []int) {
-	return file_task_v1_messages_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *UpsertTaskResponse) GetId() string {
-	if x != nil {
-		return x.Id
+func (x *UpdateTaskRequest) GetSolutionRunnerId() string {
+	if x != nil && x.SolutionRunnerId != nil {
+		return *x.SolutionRunnerId
 	}
 	return ""
 }
@@ -534,7 +650,7 @@ type DeleteTaskRequest struct {
 
 func (x *DeleteTaskRequest) Reset() {
 	*x = DeleteTaskRequest{}
-	mi := &file_task_v1_messages_proto_msgTypes[8]
+	mi := &file_task_v1_messages_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -546,7 +662,7 @@ func (x *DeleteTaskRequest) String() string {
 func (*DeleteTaskRequest) ProtoMessage() {}
 
 func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_task_v1_messages_proto_msgTypes[8]
+	mi := &file_task_v1_messages_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -559,10 +675,54 @@ func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTaskRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTaskRequest) Descriptor() ([]byte, []int) {
-	return file_task_v1_messages_proto_rawDescGZIP(), []int{8}
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DeleteTaskRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CreateTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTaskResponse) Reset() {
+	*x = CreateTaskResponse{}
+	mi := &file_task_v1_messages_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTaskResponse) ProtoMessage() {}
+
+func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_task_v1_messages_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTaskResponse.ProtoReflect.Descriptor instead.
+func (*CreateTaskResponse) Descriptor() ([]byte, []int) {
+	return file_task_v1_messages_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CreateTaskResponse) GetId() string {
 	if x != nil {
 		return x.Id
 	}
@@ -577,19 +737,31 @@ const file_task_v1_messages_proto_rawDesc = "" +
 	"\x0eGetTaskRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"<\n" +
 	"\x0fGetTasksRequest\x12)\n" +
-	"\x10include_solution\x18\x01 \x01(\bR\x0fincludeSolution\"N\n" +
-	"\bTestCase\x12\x14\n" +
-	"\x05order\x18\x01 \x01(\x05R\x05order\x12\x14\n" +
-	"\x05input\x18\x02 \x01(\tR\x05input\x12\x16\n" +
-	"\x06output\x18\x03 \x01(\tR\x06output\"\xfa\x01\n" +
+	"\x10include_solution\x18\x01 \x01(\bR\x0fincludeSolution\"{\n" +
+	"\bTestCase\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05order\x18\x02 \x01(\x05R\x05order\x12\x14\n" +
+	"\x05input\x18\x03 \x01(\tR\x05input\x12\x16\n" +
+	"\x06output\x18\x04 \x01(\tR\x06output\x12\x1b\n" +
+	"\tis_hidden\x18\x05 \x01(\bR\bisHidden\"\x91\x01\n" +
+	"\rTestCaseGroup\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05score\x18\x03 \x01(\x05R\x05score\x12\x14\n" +
+	"\x05order\x18\x04 \x01(\x05R\x05order\x120\n" +
+	"\n" +
+	"test_cases\x18\x05 \x03(\v2\x11.task.v1.TestCaseR\ttestCases\"\x92\x03\n" +
 	"\fTaskResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
-	"\bsolution\x18\x02 \x01(\tR\bsolution\x12/\n" +
-	"\ttestcases\x18\x03 \x03(\v2\x11.task.v1.TestCaseR\ttestcases\x12,\n" +
-	"\x12allowed_runner_ids\x18\x04 \x03(\tR\x10allowedRunnerIds\x12*\n" +
-	"\x11compare_script_id\x18\x05 \x01(\tR\x0fcompareScriptId\x12)\n" +
-	"\x05limit\x18\x06 \x01(\v2\x0e.task.v1.LimitH\x00R\x05limit\x88\x01\x01B\b\n" +
-	"\x06_limit\"?\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12<\n" +
+	"\x0esolution_files\x18\x02 \x03(\v2\x15.task.v1.SolutionFileR\rsolutionFiles\x12@\n" +
+	"\x10test_case_groups\x18\x03 \x03(\v2\x16.task.v1.TestCaseGroupR\x0etestCaseGroups\x12,\n" +
+	"\x12allowed_runner_ids\x18\x04 \x03(\tR\x10allowedRunnerIds\x12/\n" +
+	"\x11compare_script_id\x18\x05 \x01(\tH\x00R\x0fcompareScriptId\x88\x01\x01\x12)\n" +
+	"\x05limit\x18\x06 \x01(\v2\x0e.task.v1.LimitH\x01R\x05limit\x88\x01\x01\x121\n" +
+	"\x12solution_runner_id\x18\a \x01(\tH\x02R\x10solutionRunnerId\x88\x01\x01B\x14\n" +
+	"\x12_compare_script_idB\b\n" +
+	"\x06_limitB\x15\n" +
+	"\x13_solution_runner_id\"?\n" +
 	"\x10GetTasksResponse\x12+\n" +
 	"\x05tasks\x18\x01 \x03(\v2\x15.task.v1.TaskResponseR\x05tasks\"\x82\x02\n" +
 	"\x05Limit\x12\x19\n" +
@@ -600,24 +772,27 @@ const file_task_v1_messages_proto_rawDesc = "" +
 	"\x05stack\x18\x05 \x01(\x05R\x05stack\x12$\n" +
 	"\x0emax_open_files\x18\x06 \x01(\x05R\fmaxOpenFiles\x12\"\n" +
 	"\rmax_file_size\x18\a \x01(\x02R\vmaxFileSize\x12#\n" +
-	"\rnetwork_allow\x18\b \x01(\bR\fnetworkAllow\"\xa4\x02\n" +
-	"\x11UpsertTaskRequest\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12\x1f\n" +
-	"\bsolution\x18\x02 \x01(\tH\x01R\bsolution\x88\x01\x01\x12/\n" +
-	"\ttestcases\x18\x03 \x03(\v2\x11.task.v1.TestCaseR\ttestcases\x12,\n" +
-	"\x12allowed_runner_ids\x18\x04 \x03(\tR\x10allowedRunnerIds\x12\"\n" +
-	"\n" +
-	"compare_id\x18\x05 \x01(\tH\x02R\tcompareId\x88\x01\x01\x12)\n" +
-	"\x05limit\x18\x06 \x01(\v2\x0e.task.v1.LimitH\x03R\x05limit\x88\x01\x01B\x05\n" +
-	"\x03_idB\v\n" +
-	"\t_solutionB\r\n" +
-	"\v_compare_idB\b\n" +
-	"\x06_limit\"$\n" +
-	"\x12UpsertTaskResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"#\n" +
+	"\rnetwork_allow\x18\b \x01(\bR\fnetworkAllow\"<\n" +
+	"\fSolutionFile\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\xa3\x03\n" +
+	"\x11UpdateTaskRequest\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tH\x00R\x02id\x88\x01\x01\x12<\n" +
+	"\x0esolution_files\x18\x02 \x03(\v2\x15.task.v1.SolutionFileR\rsolutionFiles\x12@\n" +
+	"\x10test_case_groups\x18\x03 \x03(\v2\x16.task.v1.TestCaseGroupR\x0etestCaseGroups\x12,\n" +
+	"\x12allowed_runner_ids\x18\x04 \x03(\tR\x10allowedRunnerIds\x12/\n" +
+	"\x11compare_script_id\x18\x05 \x01(\tH\x01R\x0fcompareScriptId\x88\x01\x01\x12)\n" +
+	"\x05limit\x18\x06 \x01(\v2\x0e.task.v1.LimitH\x02R\x05limit\x88\x01\x01\x121\n" +
+	"\x12solution_runner_id\x18\a \x01(\tH\x03R\x10solutionRunnerId\x88\x01\x01B\x05\n" +
+	"\x03_idB\x14\n" +
+	"\x12_compare_script_idB\b\n" +
+	"\x06_limitB\x15\n" +
+	"\x13_solution_runner_id\"#\n" +
 	"\x11DeleteTaskRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02idB\x89\x01\n" +
-	"\vcom.task.v1B\rMessagesProtoP\x01Z.github.com/CSKU-Lab/config-server/grpc/task/v1\xa2\x02\x03TXX\xaa\x02\aTask.V1\xca\x02\aTask\\V1\xe2\x02\x13Task\\V1\\GPBMetadata\xea\x02\bTask::V1b\x06proto3"
+	"\x02id\x18\x01 \x01(\tR\x02id\"$\n" +
+	"\x12CreateTaskResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02idB\x88\x01\n" +
+	"\vcom.task.v1B\rMessagesProtoP\x01Z-github.com/CSKU-Lab/task-service/grpc/task/v1\xa2\x02\x03TXX\xaa\x02\aTask.V1\xca\x02\aTask\\V1\xe2\x02\x13Task\\V1\\GPBMetadata\xea\x02\bTask::V1b\x06proto3"
 
 var (
 	file_task_v1_messages_proto_rawDescOnce sync.Once
@@ -631,29 +806,34 @@ func file_task_v1_messages_proto_rawDescGZIP() []byte {
 	return file_task_v1_messages_proto_rawDescData
 }
 
-var file_task_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_task_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_task_v1_messages_proto_goTypes = []any{
 	(*GetTaskRequest)(nil),     // 0: task.v1.GetTaskRequest
 	(*GetTasksRequest)(nil),    // 1: task.v1.GetTasksRequest
 	(*TestCase)(nil),           // 2: task.v1.TestCase
-	(*TaskResponse)(nil),       // 3: task.v1.TaskResponse
-	(*GetTasksResponse)(nil),   // 4: task.v1.GetTasksResponse
-	(*Limit)(nil),              // 5: task.v1.Limit
-	(*UpsertTaskRequest)(nil),  // 6: task.v1.UpsertTaskRequest
-	(*UpsertTaskResponse)(nil), // 7: task.v1.UpsertTaskResponse
-	(*DeleteTaskRequest)(nil),  // 8: task.v1.DeleteTaskRequest
+	(*TestCaseGroup)(nil),      // 3: task.v1.TestCaseGroup
+	(*TaskResponse)(nil),       // 4: task.v1.TaskResponse
+	(*GetTasksResponse)(nil),   // 5: task.v1.GetTasksResponse
+	(*Limit)(nil),              // 6: task.v1.Limit
+	(*SolutionFile)(nil),       // 7: task.v1.SolutionFile
+	(*UpdateTaskRequest)(nil),  // 8: task.v1.UpdateTaskRequest
+	(*DeleteTaskRequest)(nil),  // 9: task.v1.DeleteTaskRequest
+	(*CreateTaskResponse)(nil), // 10: task.v1.CreateTaskResponse
 }
 var file_task_v1_messages_proto_depIdxs = []int32{
-	2, // 0: task.v1.TaskResponse.testcases:type_name -> task.v1.TestCase
-	5, // 1: task.v1.TaskResponse.limit:type_name -> task.v1.Limit
-	3, // 2: task.v1.GetTasksResponse.tasks:type_name -> task.v1.TaskResponse
-	2, // 3: task.v1.UpsertTaskRequest.testcases:type_name -> task.v1.TestCase
-	5, // 4: task.v1.UpsertTaskRequest.limit:type_name -> task.v1.Limit
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	2, // 0: task.v1.TestCaseGroup.test_cases:type_name -> task.v1.TestCase
+	7, // 1: task.v1.TaskResponse.solution_files:type_name -> task.v1.SolutionFile
+	3, // 2: task.v1.TaskResponse.test_case_groups:type_name -> task.v1.TestCaseGroup
+	6, // 3: task.v1.TaskResponse.limit:type_name -> task.v1.Limit
+	4, // 4: task.v1.GetTasksResponse.tasks:type_name -> task.v1.TaskResponse
+	7, // 5: task.v1.UpdateTaskRequest.solution_files:type_name -> task.v1.SolutionFile
+	3, // 6: task.v1.UpdateTaskRequest.test_case_groups:type_name -> task.v1.TestCaseGroup
+	6, // 7: task.v1.UpdateTaskRequest.limit:type_name -> task.v1.Limit
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_task_v1_messages_proto_init() }
@@ -661,15 +841,15 @@ func file_task_v1_messages_proto_init() {
 	if File_task_v1_messages_proto != nil {
 		return
 	}
-	file_task_v1_messages_proto_msgTypes[3].OneofWrappers = []any{}
-	file_task_v1_messages_proto_msgTypes[6].OneofWrappers = []any{}
+	file_task_v1_messages_proto_msgTypes[4].OneofWrappers = []any{}
+	file_task_v1_messages_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_task_v1_messages_proto_rawDesc), len(file_task_v1_messages_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

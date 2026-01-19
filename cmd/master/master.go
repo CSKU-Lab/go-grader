@@ -380,7 +380,10 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				mu.Lock()
 				defer mu.Unlock()
 
+				s.logger.Infoln("runResults", runResults)
+
 				runResults = append(runResults, &pb.TestCaseResponse{
+					Id:     testcase.GetId(),
 					Order:  testcase.GetOrder(),
 					Input:  testcase.GetInput(),
 					Output: output,
