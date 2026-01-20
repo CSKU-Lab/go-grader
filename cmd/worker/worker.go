@@ -93,7 +93,6 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
-		defer wg.Done()
 		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(message []byte) error {
 			payload := &models.RunExecution{}
 
@@ -133,7 +132,7 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.PublishToTopic(ctx, "topic.run_results", "result."+payload.ID, payload.ID, bytesResult)
+			err = q.PublishWithContext(ctx, "run_results", "result."+payload.ID, payload.ID, bytesResult)
 			if err != nil {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
@@ -151,7 +150,7 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.PublishToTopic(ctx, "topic.run_results", "result."+payload.ID, payload.ID, bytesResult)
+			err = q.PublishWithContext(ctx, "run_results", "result."+payload.ID, payload.ID, bytesResult)
 			if err != nil {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}

@@ -172,7 +172,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, "failed to marshal execution payload")
 	}
 
-	err = s.q.Publish(ctx, "run", message)
+	err = s.q.PublishWithContext(ctx, "run", "run", id.String(), message)
 	if err != nil {
 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 		return status.Error(codes.Internal, "failed to queue execution")
@@ -263,7 +263,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 		return nil, status.Error(codes.Internal, "failed to marshal execution payload")
 	}
 
-	err = s.q.Publish(ctx, "grade", message)
+	err = s.q.PublishWithContext(ctx, "grade", "grade", id.String(), message)
 	if err != nil {
 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 		return nil, status.Error(codes.Internal, "failed to queue execution")
@@ -352,14 +352,14 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				return status.Error(codes.Internal, "failed to marshal execution payload")
 			}
 
-			err = s.q.Publish(ctx, "run", message)
+			err = s.q.PublishWithContext(ctx, "run", "run", id.String(), message)
 			if err != nil {
 				s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 				return status.Error(codes.Internal, "failed to queue execution")
 			}
 			s.logger.Info("Publish message to the queue successfully!")
 
-			return s.q.ConsumeFromTopic(ctx, "topic.run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
+			return s.q.ConsumeFromTopic(ctx, "run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
 				result := &models.RunResult{}
 				err := json.Unmarshal(msg, result)
 				if err != nil {
@@ -370,24 +370,22 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 
 				if result.Status != execution.QUEUED && result.Status != execution.RUNNING {
 					exit <- struct{}{}
+
+					output := result.StdOut
+					if output == "" {
+						output = result.StdErr
+					}
+
+					mu.Lock()
+					defer mu.Unlock()
+
+					runResults = append(runResults, &pb.TestCaseResponse{
+						Id:     testcase.GetId(),
+						Order:  testcase.GetOrder(),
+						Input:  testcase.GetInput(),
+						Output: output,
+					})
 				}
-
-				output := result.StdOut
-				if output == "" {
-					output = result.StdErr
-				}
-
-				mu.Lock()
-				defer mu.Unlock()
-
-				s.logger.Infoln("runResults", runResults)
-
-				runResults = append(runResults, &pb.TestCaseResponse{
-					Id:     testcase.GetId(),
-					Order:  testcase.GetOrder(),
-					Input:  testcase.GetInput(),
-					Output: output,
-				})
 
 				return nil
 			})

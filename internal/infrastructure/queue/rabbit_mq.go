@@ -10,10 +10,8 @@ import (
 )
 
 type rabbitmq struct {
-	conn     *amqp.Connection
-	ch       *amqp.Channel
-	confirms chan amqp.Confirmation
-	logger   *zap.SugaredLogger
+	conn   *amqp.Connection
+	logger *zap.SugaredLogger
 }
 
 func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, error) {
@@ -23,11 +21,6 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 	}
 
 	ch, err := conn.Channel()
-	if err != nil {
-		return nil, err
-	}
-
-	err = ch.Confirm(false)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +80,8 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 
 	// topic exchanges for run results
 	err = ch.ExchangeDeclare(
-		"topic.run_results",
-		"topic",
+		"run_results",
+		"direct",
 		true,
 		false,
 		false,
@@ -99,44 +92,24 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 		return nil, err
 	}
 
-	confirms := ch.NotifyPublish(make(chan amqp.Confirmation))
-
 	return &rabbitmq{
-		conn:     conn,
-		ch:       ch,
-		confirms: confirms,
-		logger:   logger,
+		conn:   conn,
+		logger: logger,
 	}, nil
 }
 
-func (r *rabbitmq) Publish(ctx context.Context, exchange string, message []byte) error {
-	err := r.ch.PublishWithContext(
-		ctx,
-		exchange,
-		exchange,
-		false,
-		false,
-		amqp.Publishing{
-			DeliveryMode: amqp.Persistent,
-			ContentType:  "application/json",
-			Body:         message,
-		},
-	)
+func (r *rabbitmq) PublishWithContext(ctx context.Context, topic string, key string, correlationID string, message []byte) error {
+	ch, err := r.conn.Channel()
 	if err != nil {
 		return err
 	}
 
-	confirmed := <-r.confirms
-
-	if confirmed.Ack {
-		return nil
-	} else {
-		return errors.New("failed to publish message to the queue")
+	err = ch.Confirm(false)
+	if err != nil {
+		return err
 	}
-}
 
-func (r *rabbitmq) PublishToTopic(ctx context.Context, topic string, key string, correlationID string, message []byte) error {
-	err := r.ch.PublishWithContext(
+	err = ch.PublishWithContext(
 		ctx,
 		topic,
 		key,
@@ -152,7 +125,7 @@ func (r *rabbitmq) PublishToTopic(ctx context.Context, topic string, key string,
 		return err
 	}
 
-	confirmed := <-r.confirms
+	confirmed := <-ch.NotifyPublish(make(chan amqp.Confirmation))
 
 	if confirmed.Ack {
 		return nil
@@ -162,26 +135,31 @@ func (r *rabbitmq) PublishToTopic(ctx context.Context, topic string, key string,
 }
 
 func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key string, prefetchCount int, handler func(message []byte, exit chan struct{}) error) error {
-	q, err := r.ch.QueueDeclare("", false, true, true, false, nil)
+	ch, err := r.conn.Channel()
 	if err != nil {
 		return err
 	}
 
-	err = r.ch.QueueBind(q.Name, key, topic, false, nil)
+	q, err := ch.QueueDeclare("", false, true, true, false, nil)
+	if err != nil {
+		return err
+	}
+
+	err = ch.QueueBind(q.Name, key, topic, false, nil)
 	if err != nil {
 		return err
 	}
 
 	exitChan := make(chan struct{}, 1)
-	consumerTag, err := r.ch.Consume(q.Name, "", true, true, false, false, nil)
+	consumerTag, err := ch.Consume(q.Name, "", true, true, false, false, nil)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
 		close(exitChan)
-		r.ch.Cancel(q.Name, false)
-		r.ch.QueueDelete(q.Name, false, false, false)
+		ch.Cancel(q.Name, false)
+		ch.QueueDelete(q.Name, false, false, false)
 	}()
 
 	for {
@@ -196,6 +174,14 @@ func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key strin
 			if !ok {
 				r.logger.Infoln("Message channel closed, stopping consuming messages from the queue")
 				return nil
+			}
+
+			select {
+			case <-exitChan:
+				r.logger.Infoln("Exit signal received, stopping consuming messages from the queue")
+				msg.Nack(false, true)
+				return nil
+			default:
 			}
 
 			if msg.MessageId != "" {
@@ -213,12 +199,17 @@ func (r *rabbitmq) ConsumeFromTopic(ctx context.Context, topic string, key strin
 }
 
 func (r *rabbitmq) Consume(ctx context.Context, queue string, prefetchCount int, handler func(message []byte) error) error {
-	err := r.ch.Qos(prefetchCount, 0, false)
+	ch, err := r.conn.Channel()
 	if err != nil {
 		return err
 	}
 
-	msgs, err := r.ch.ConsumeWithContext(
+	err = ch.Qos(prefetchCount, 0, false)
+	if err != nil {
+		return err
+	}
+
+	msgs, err := ch.ConsumeWithContext(
 		ctx,
 		queue,
 		"",
@@ -269,6 +260,5 @@ func (r *rabbitmq) Consume(ctx context.Context, queue string, prefetchCount int,
 }
 
 func (r *rabbitmq) Close() {
-	r.ch.Close()
 	r.conn.Close()
 }
