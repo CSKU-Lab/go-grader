@@ -179,15 +179,10 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 			exit <- struct{}{}
 		}
 
-		output := result.StdOut
-		if output == "" {
-			output = result.StdErr
-		}
-
 		return stream.Send(&pb.RunResultResponse{
 			ExecutionId: result.ID,
 			Status:      executionStatusToProtoStatus(result.Status),
-			Output:      output,
+			Output:      result.Output,
 			WallTime:    result.WallTime,
 			Memory:      result.Memory,
 		})
@@ -353,11 +348,6 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				if result.Status != execution.QUEUED && result.Status != execution.RUNNING {
 					exit <- struct{}{}
 
-					output := result.StdOut
-					if output == "" {
-						output = result.StdErr
-					}
-
 					mu.Lock()
 					defer mu.Unlock()
 
@@ -365,7 +355,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 						Id:     testcase.GetId(),
 						Order:  testcase.GetOrder(),
 						Input:  testcase.GetInput(),
-						Output: output,
+						Output: result.Output,
 					})
 				}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 type executorService struct {
@@ -18,7 +19,7 @@ type executorService struct {
 }
 
 type ExecutorService interface {
-	NewExecutor() Executor
+	NewExecutor() ExecutorBuilder
 }
 
 func NewExecutorService(logger *zap.SugaredLogger, isolateService *IsolateService, runnerService *RunnerService, compareService *CompareService) ExecutorService {
@@ -30,208 +31,175 @@ func NewExecutorService(logger *zap.SugaredLogger, isolateService *IsolateServic
 	}
 }
 
-type Result struct {
-	StdOut   string
-	StdErr   string
-	Metadata *models.Metadata
+type ExecutorBuilder interface {
+	RunnerID(ID string) ExecutorBuilder
+	Files(files []models.File) ExecutorBuilder
+	Input(input string) ExecutorBuilder
+	Limits(limits *models.Limit) ExecutorBuilder
+	TestCaseGroups(testCases []models.TestCaseGroup) ExecutorBuilder
+	CompareID(ID string) ExecutorBuilder
+	Build() (*executor, error)
 }
 
 type executor struct {
-	instance       *IsolateInstance
+	logger         *zap.SugaredLogger
+	compare        *models.LocalCompare
+	runner         *models.LocalRunner
+	isolateService *IsolateService
+
+	limits         *models.Limit
+	files          []models.File
+	testCaseGroups []models.TestCaseGroup
+	input          string
+}
+
+type executorBuilder struct {
+	runnerID       string
+	compareID      string
+	files          []models.File
+	input          string
+	limits         *models.Limit
+	testcaseGroups []models.TestCaseGroup
+
+	isolateService *IsolateService
 	runnerService  *RunnerService
 	compareService *CompareService
-	lang           *models.LocalRunner
-	comparePath    string
-	limits         *models.Limit
-	hasInput       bool
-	testCaseGroups []models.TestCaseGroup
 	logger         *zap.SugaredLogger
 }
 
-type Executor interface {
-	Cleanup() error
-	SetRunner(ID string) error
-	SetFiles(files []models.File) error
-	SetInput(input string) error
-	SetLimits(limits *models.Limit)
-	SetTestCaseGroups(testCases []models.TestCaseGroup)
-	SetCompareID(ID string)
-	Run() (*models.RunResult, error)
-	Grade() (*models.GradeResult, error)
-}
-
-func (r *executorService) NewExecutor() Executor {
-	return &executor{
-		instance:       r.isolateService.NewInstance(),
+func (r *executorService) NewExecutor() ExecutorBuilder {
+	return &executorBuilder{
 		runnerService:  r.runnerService,
+		isolateService: r.isolateService,
 		compareService: r.compareService,
 		logger:         r.logger,
 	}
 }
 
-func (r *executor) Cleanup() error {
-	return r.instance.Cleanup()
+func (r *executorBuilder) RunnerID(ID string) ExecutorBuilder {
+	r.runnerID = ID
+	return r
 }
 
-func (r *executor) SetRunner(ID string) error {
-	language, err := r.runnerService.GetByID(ID)
-	if err != nil {
-		return err
+func (r *executorBuilder) Files(files []models.File) ExecutorBuilder {
+	r.files = files
+	return r
+}
+
+func (r *executorBuilder) Input(input string) ExecutorBuilder {
+	r.input = input
+	return r
+}
+
+func (r *executorBuilder) CompareID(compareID string) ExecutorBuilder {
+	r.compareID = compareID
+	return r
+}
+
+func (r *executorBuilder) Limits(limits *models.Limit) ExecutorBuilder {
+	r.limits = limits
+	return r
+}
+
+func (r *executorBuilder) TestCaseGroups(testCaseGroups []models.TestCaseGroup) ExecutorBuilder {
+	r.testcaseGroups = testCaseGroups
+	return r
+}
+
+func (r *executorBuilder) Build() (*executor, error) {
+	if r.files == nil {
+		return nil, errors.New("files must be provided")
 	}
 
-	r.lang = language
-	return nil
+	exec := &executor{
+		logger:         r.logger,
+		limits:         r.limits,
+		files:          r.files,
+		testCaseGroups: r.testcaseGroups,
+		input:          r.input,
+		isolateService: r.isolateService,
+	}
+
+	runner, err := r.runnerService.GetByID(r.runnerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get runner: %w", err)
+	}
+
+	exec.runner = runner
+
+	if r.compareID != "" {
+		compare, err := r.compareService.GetByID(r.compareID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get compare: %w", err)
+		}
+		exec.compare = compare
+	}
+
+	return exec, nil
 }
 
-func (r *executor) SetFiles(files []models.File) error {
-	for _, file := range files {
-		if err := r.instance.CreateFile(file.Name, file.Content, 0655); err != nil {
-			return err
+func (r *executor) Run() (*models.RunResult, error) {
+	instance := r.isolateService.NewInstance()
+
+	for _, file := range r.files {
+		err := instance.CreateFile(file.Name, file.Content, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file %s: %w", file.Name, err)
 		}
 	}
-	return nil
-}
 
-func (r *executor) SetInput(input string) error {
-	r.hasInput = true
-	return r.instance.CreateFile("input", input, 0644)
-}
+	if r.runner.NeedCompile {
+		output, err := instance.CompileUsing(r.runner.Path)
+		if err != nil {
+			return &models.RunResult{
+				Status: execution.COMPILE_FAILED,
+				Output: output,
+			}, nil
+		}
+	}
 
-func (r *executor) compile() (*models.RunResult, error) {
-	err := r.instance.CompileUsing(r.lang.Path)
+	output, err := instance.Run(r.runner.Path, r.input, r.limits)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			stderr, err := r.instance.GetError()
-			if err != nil {
-				return nil, err
-			}
-
+			r.logger.Errorw("Run error", "error", err.Error(), "output", output)
 			return &models.RunResult{
-				Status: execution.COMPILE_FAILED,
-				StdOut: "",
-				StdErr: stderr,
+				Status: execution.RUN_FAILED,
+				Output: output,
 			}, nil
 		}
 		return nil, err
 	}
 
-	return nil, nil
-}
-
-func (r *executor) run() (*Result, error) {
-	err := r.instance.Run(r.lang.Path, r.limits, r.hasInput)
+	metadata, err := instance.GetMetadata()
 	if err != nil {
 		return nil, err
-	}
-
-	stdOut, err := r.instance.GetOutput()
-	if err != nil {
-		return nil, err
-	}
-
-	stdErr, err := r.instance.GetError()
-	if err != nil {
-		return nil, err
-	}
-
-	metadata, err := r.instance.GetMetadata()
-	if err != nil {
-		return nil, err
-	}
-
-	return &Result{
-		StdOut:   stdOut,
-		StdErr:   stdErr,
-		Metadata: metadata,
-	}, nil
-}
-
-func (r *executor) SetLimits(limits *models.Limit) {
-	r.limits = limits
-}
-
-func (r *executor) SetTestCaseGroups(testCaseGroups []models.TestCaseGroup) {
-	if r.comparePath == "" {
-		r.logger.Fatal("You need to set compare ID before setting test cases")
-	}
-	r.testCaseGroups = testCaseGroups
-}
-
-func (r *executor) SetCompareID(ID string) {
-	compare, err := r.compareService.GetByID(ID)
-	if err != nil {
-		r.logger.Fatalw("Cannot get compare", "error", err)
-	}
-
-	r.comparePath = compare.Path
-}
-
-func (r *executor) compare(solOutput string) (string, error) {
-	err := r.instance.CreateFile("sol_output", solOutput, 0644)
-	if err != nil {
-		return "", fmt.Errorf("failed to create sol_output file: %w", err)
-	}
-
-	err = r.instance.Run(r.comparePath, nil, false)
-	if err != nil {
-		return "", fmt.Errorf("failed to run compare: %w", err)
-	}
-
-	result, err := r.instance.GetCompareResult()
-	if err != nil {
-		return "", fmt.Errorf("failed to get compare result: %w", err)
-	}
-
-	return result, nil
-}
-
-func (r *executor) Run() (*models.RunResult, error) {
-	if r.lang.NeedCompile {
-		result, err := r.compile()
-		if err != nil {
-			return nil, err
-		}
-
-		if result != nil {
-			return result, nil
-		}
-	}
-
-	result, err := r.run()
-	if err != nil {
-		return nil, fmt.Errorf("failed to run: %w", err)
 	}
 
 	runResult := &models.RunResult{
-		WallTime: result.Metadata.WallTime,
-		Memory:   result.Metadata.Memory,
-		StdOut:   result.StdOut,
-		StdErr:   result.StdErr,
-	}
-	if result.StdErr != "" {
-		runResult.Status = execution.RUN_FAILED
-		return runResult, nil
+		WallTime: metadata.WallTime,
+		Memory:   metadata.Memory,
+		Output:   output,
 	}
 
-	r.hasInput = false
 	runResult.Status = execution.RUN_PASSED
 	return runResult, nil
 }
 
 func (r *executor) Grade() (*models.GradeResult, error) {
-	if r.lang.NeedCompile {
-		result, err := r.compile()
-		if err != nil {
-			return nil, err
-		}
+	if r.compare == nil {
+		return nil, errors.New("compare must be provided for grading")
+	}
 
-		// this mean compilation failed
-		if result != nil {
+	if r.runner.NeedCompile {
+		instance := r.isolateService.NewInstance()
+		_, err := instance.CompileUsing(r.runner.Path)
+		if err != nil {
 			return &models.GradeResult{
-				Status: result.Status,
+				Status: execution.COMPILE_FAILED,
 			}, nil
 		}
+		instance.Cleanup()
 	}
 
 	totalWallTime := float32(0)
@@ -283,74 +251,116 @@ type resultMetadata struct {
 }
 
 func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.TestCaseResult, *resultMetadata, error) {
-	metadata := &resultMetadata{}
+	resultMetadata := &resultMetadata{}
 	testCaseResults := make([]models.TestCaseResult, 0, len(tcs))
+	var eg errgroup.Group
 	for _, tc := range tcs {
-		if err := r.SetInput(tc.Input); err != nil {
-			return nil, nil, fmt.Errorf("failed to set input: %w", err)
-		}
-
-		result, err := r.run()
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to run: %w", err)
-		}
-
-		metadata.totalWallTime += result.Metadata.WallTime
-		metadata.totalMemory += result.Metadata.Memory
-
-		output := result.StdOut
-		if result.StdErr != "" {
-			output = result.StdErr
-		}
-
-		testCaseResult := models.TestCaseResult{
-			ID:       tc.ID,
-			Status:   execution.RUN_FAILED,
-			Output:   output,
-			WallTime: result.Metadata.WallTime,
-			Memory:   result.Metadata.Memory,
-		}
-
-		if result.Metadata.FailedStatus != "" {
-			testCaseResult.Message = result.Metadata.FailedMessage
-			switch result.Metadata.FailedStatus {
-			case "TO":
-				testCaseResult.Status = execution.TIME_LIMIT_EXCEEDED
-			case "RE":
-				testCaseResult.Status = execution.RUNTIME_ERROR
-			case "SG":
-				testCaseResult.Status = execution.SIGNAL_ERROR
-			case "XX":
-				testCaseResult.Status = execution.GRADER_ERROR
+		eg.Go(func() error {
+			instance := r.isolateService.NewInstance()
+			testCaseResult := models.TestCaseResult{
+				ID:     tc.ID,
+				Status: execution.RUN_FAILED,
 			}
 
-			if r.limits.Memory != 0 && result.Metadata.Memory > r.limits.Memory {
-				testCaseResult.Status = execution.MEMORY_LIMIT_EXCEEDED
+			for _, file := range r.files {
+				err := instance.CreateFile(file.Name, file.Content, 0644)
+				if err != nil {
+					return err
+				}
 			}
 
-			metadata.isFailed = true
-		}
+			output, err := instance.Run(r.runner.Path, tc.Input, r.limits)
+			if err != nil {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					testCaseResult.Output = output
+					testCaseResult.Status = execution.RUN_FAILED
+				} else {
+					return err
+				}
+			}
 
-		err = r.instance.CreateFile("output", result.StdOut, 0644)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create output file: %w", err)
-		}
+			metadata, err := instance.GetMetadata()
+			if err != nil {
+				return err
+			}
 
-		compareResult, err := r.compare(tc.Output)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to compare: %w", err)
-		}
+			err = instance.Cleanup()
+			if err != nil {
+				r.logger.Errorw("Cleanup error", "error", err.Error())
+			}
 
-		if compareResult == "" {
-			testCaseResult.Status = execution.RUN_PASSED
-		} else {
-			metadata.isFailed = true
-		}
+			resultMetadata.totalWallTime += metadata.WallTime
+			resultMetadata.totalMemory += metadata.Memory
 
-		testCaseResults = append(testCaseResults, testCaseResult)
+			if metadata.FailedStatus != "" {
+				testCaseResult.Message = metadata.FailedMessage
+				switch metadata.FailedStatus {
+				case "TO":
+					testCaseResult.Status = execution.TIME_LIMIT_EXCEEDED
+				case "RE":
+					testCaseResult.Status = execution.RUNTIME_ERROR
+				case "SG":
+					testCaseResult.Status = execution.SIGNAL_ERROR
+				case "XX":
+					testCaseResult.Status = execution.GRADER_ERROR
+				}
 
-		r.hasInput = false
+				if r.limits.Memory != 0 && metadata.Memory > r.limits.Memory {
+					testCaseResult.Status = execution.MEMORY_LIMIT_EXCEEDED
+				}
+
+				resultMetadata.isFailed = true
+			}
+
+			instance = r.isolateService.NewInstance()
+
+			err = instance.CreateFile("output", output, 0644)
+			if err != nil {
+				return err
+			}
+
+			err = instance.CreateFile("sol_output", tc.Output, 0644)
+			if err != nil {
+				return err
+			}
+
+			output, err = instance.Run(r.compare.Path, "", nil)
+			if err != nil {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					if exitErr.ExitCode() != 1 {
+						return err
+					}
+				}
+			}
+
+			compareResult, err := instance.GetCompareResult()
+			if err != nil {
+				return err
+			}
+
+			err = instance.Cleanup()
+			if err != nil {
+				r.logger.Errorw("Cleanup error", "error", err.Error())
+			}
+
+			if compareResult == "" {
+				testCaseResult.Status = execution.RUN_PASSED
+			} else {
+				resultMetadata.isFailed = true
+			}
+
+			testCaseResults = append(testCaseResults, testCaseResult)
+			return nil
+		})
+
 	}
 
-	return testCaseResults, metadata, nil
+	err := eg.Wait()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return testCaseResults, resultMetadata, nil
 }

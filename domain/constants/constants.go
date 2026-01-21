@@ -5,6 +5,6 @@ const (
 	RUNNER_DIR        = CONFIG_DIR + "/runners"
 	COMPARE_DIR       = CONFIG_DIR + "/compares"
 	COMPARE_LIST_PATH = CONFIG_DIR + "/compare_list.json"
-	BOX_PATH          = "/var/local/lib/isolate/%d/box"
+	SANDBOX_PATH      = "/var/local/lib/isolate/%d"
 	MAX_QUEUES        = 10
 )

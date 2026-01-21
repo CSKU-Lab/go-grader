@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/models"
@@ -33,19 +34,20 @@ type IsolateInstance struct {
 	boxID        int
 	boxPath      string
 	metadataPath string
+	comparePath  string
 	boxIds       chan int
 	logger       *zap.SugaredLogger
 }
 
 func (s *IsolateService) NewInstance() *IsolateInstance {
 	boxID := <-s.boxIds
-	metadataPath := fmt.Sprintf("/tmp/box_%d_metadata", boxID)
 
 	instance := IsolateInstance{
 		ctx:          s.ctx,
 		boxID:        boxID,
-		boxPath:      fmt.Sprintf(constants.BOX_PATH, boxID),
-		metadataPath: metadataPath,
+		boxPath:      fmt.Sprintf(constants.SANDBOX_PATH+"/box", boxID),
+		metadataPath: fmt.Sprintf(constants.SANDBOX_PATH+"/metadata", boxID),
+		comparePath:  fmt.Sprintf(constants.SANDBOX_PATH+"/compare", boxID),
 		boxIds:       s.boxIds,
 		logger:       s.logger,
 	}
@@ -63,15 +65,35 @@ func (i *IsolateInstance) logFatalf(format string, args ...any) {
 	i.logger.Fatalf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
-func (s *IsolateInstance) execute(args ...string) error {
+func (s *IsolateInstance) execute(args ...string) (string, error) {
 	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
 	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
-	return cmd.Run()
+
+	output, err := cmd.Output()
+	if err != nil {
+		return string(output), err
+	}
+
+	return string(output), nil
+}
+
+func (s *IsolateInstance) executeWithInput(input string, args ...string) (string, error) {
+	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
+	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
+
+	cmd.Stdin = strings.NewReader(input)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return string(output), err
+	}
+
+	return string(output), nil
 }
 
 func (i *IsolateInstance) init() {
 	i.log("Initializing sandbox...")
-	err := i.execute("--init")
+	_, err := i.execute("--init")
 	if err != nil {
 		i.logFatalf("Error on init: %s", err)
 	}
@@ -87,14 +109,14 @@ func (i *IsolateInstance) BoxPath() string {
 
 func (i *IsolateInstance) Cleanup() error {
 	i.log("Cleaning up sandbox...")
-	err := i.execute("--cleanup")
+	_, err := i.execute("--cleanup")
 	if err != nil {
 		return err
 	}
 
 	i.boxIds <- i.boxID
 
-	return os.Remove(i.metadataPath)
+	return nil
 }
 
 func (i *IsolateInstance) CreateFile(name string, content string, filePerm os.FileMode) error {
@@ -115,52 +137,54 @@ func (i *IsolateInstance) RemoveDir(name string) error {
 	return os.RemoveAll(dirPath)
 }
 
-func (i *IsolateInstance) Compile() error {
+func (i *IsolateInstance) Compile() (string, error) {
 	i.log("Compiling program...")
 
 	args := []string{
 		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"--processes=0",
-		"--stderr=stderr",
+		"--stderr-to-stdout",
 		"--run",
 		"--",
 		"build_script.sh",
 	}
 
-	err := i.execute(args...)
+	output, err := i.execute(args...)
 	if err != nil {
 		i.log("Compile error : %s", err.Error())
+		return output, err
 	}
 
 	i.log("Compile done.")
 
-	return err
+	return output, err
 }
 
-func (i *IsolateInstance) CompileUsing(scriptDir string) error {
+func (i *IsolateInstance) CompileUsing(scriptDir string) (string, error) {
 	i.log("Compiling program...")
 
 	args := []string{
 		"--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		fmt.Sprintf("--dir=%s", scriptDir),
 		"--processes=0",
-		"--stderr=stderr",
+		"--stderr-to-stdout",
 		"--run",
 		"--",
 		fmt.Sprintf("%s/build_script.sh", scriptDir),
 	}
 
-	err := i.execute(args...)
+	output, err := i.execute(args...)
 	if err != nil {
 		i.log("Compile error : %s", err.Error())
+		return output, err
 	}
 
 	i.log("Compile done.")
 
-	return err
+	return output, nil
 }
 
-func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bool) error {
+func (i *IsolateInstance) Run(scriptDir string, input string, limit *models.Limit) (string, error) {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
@@ -168,72 +192,44 @@ func (i *IsolateInstance) Run(scriptDir string, limit *models.Limit, hasInput bo
 		"--meta=" + i.metadataPath,
 		fmt.Sprintf("--dir=%s", scriptDir),
 		"--processes=100",
-		"--stdout=stdout",
-		"--stderr=stderr",
+		"--stderr-to-stdout",
 		"--run",
 		"--",
 		fmt.Sprintf("%s/run_script.sh", scriptDir),
 	}
 
-	if hasInput {
-		args = append([]string{"--stdin=input"}, args...)
-	}
-
 	args = append(_limits, args...)
 
-	err := i.execute(args...)
+	var output string
+	var err error
+
+	if input != "" {
+		output, err = i.executeWithInput(input, args...)
+	} else {
+		output, err = i.execute(args...)
+	}
+
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			// recheck if the command you ran with isolate command is exist
 			if exitErr.ExitCode() == 127 {
-				return errors.New("the command you pass to isolate is not exist")
+				return output, errors.New("the command you pass to isolate is not exist")
 			}
-			return nil
 		}
-		return err
+		return output, err
 	}
-	return nil
-}
-
-func (i *IsolateInstance) GetOutput() (string, error) {
-	i.log("Getting stdout...")
-
-	data, err := os.ReadFile(i.boxPath + "/stdout")
-	if err != nil {
-		return "", fmt.Errorf("Cannot read stdout file : %s", err)
-	}
-
-	return string(data), nil
-}
-
-func (i *IsolateInstance) GetError() (string, error) {
-	i.log("Getting stderror...")
-	data, err := os.ReadFile(i.boxPath + "/stderr")
-	if err != nil {
-		return "", fmt.Errorf("Cannot read stderr file : %s", err)
-	}
-
-	return string(data), nil
-}
-
-func (i *IsolateInstance) getMetadata() (string, error) {
-	i.log("Getting Metadata...")
-	data, err := os.ReadFile(i.metadataPath)
-	if err != nil {
-		return "", fmt.Errorf("Cannot read metadata file : %s", err)
-	}
-
-	return string(data), nil
+	return output, nil
 }
 
 func (i *IsolateInstance) GetMetadata() (*models.Metadata, error) {
-	metadata, err := i.getMetadata()
+	i.log("Getting Metadata...")
+	data, err := os.ReadFile(i.metadataPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Cannot read metadata file : %s", err)
 	}
 
-	return models.ParseMetadata(metadata)
+	return models.ParseMetadata(string(data))
 }
 
 func (i *IsolateInstance) GetCompareResult() (string, error) {

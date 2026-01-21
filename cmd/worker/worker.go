@@ -103,26 +103,15 @@ func main() {
 				return err
 			}
 
-			executor := executorService.NewExecutor()
-			defer executor.Cleanup()
+			executor, err := executorService.NewExecutor().
+				RunnerID(payload.RunnerID).
+				Files(payload.Files).
+				Input(payload.Input).
+				Limits(payload.Limit).
+				Build()
 
-			if err := executor.SetRunner(payload.RunnerID); err != nil {
-				logger.Errorw("Cannot set runner", "error", err)
+			if err != nil {
 				return err
-			}
-
-			if err := executor.SetFiles(payload.Files); err != nil {
-				logger.Errorw("Cannot set files", "error", err)
-				return err
-			}
-
-			if err := executor.SetInput(payload.Input); err != nil {
-				logger.Errorw("Cannot set input", "error", err)
-				return err
-			}
-
-			if payload.Limit != nil {
-				executor.SetLimits(payload.Limit)
 			}
 
 			bytesResult, err := json.Marshal(models.RunResult{
@@ -166,7 +155,7 @@ func main() {
 			return nil
 		})
 		if err != nil {
-			logger.Errorw("Cannot consume message from the run queue", "error", err)
+			logger.Errorw("error", err)
 		}
 	})
 
@@ -180,27 +169,15 @@ func main() {
 				return err
 			}
 
-			executor := executorService.NewExecutor()
-			defer executor.Cleanup()
-
-			if err := executor.SetRunner(payload.RunnerID); err != nil {
-				logger.Errorw("Cannot set runner", "error", err)
-				return err
-			}
-
-			if err := executor.SetFiles(payload.Files); err != nil {
-				logger.Errorw("Cannot set files", "error", err)
-				return err
-			}
-
 			task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{Id: payload.TaskID})
 			if err != nil {
 				logger.Errorw("Cannot get task from gRPC server", "error", err)
 				return err
 			}
 
+			var limit *models.Limit
 			if task.Limit != nil {
-				executor.SetLimits(&models.Limit{
+				limit = &models.Limit{
 					CPUTime:      task.Limit.CpuTime,
 					CPUExtraTime: task.Limit.CpuExtraTime,
 					Memory:       task.Limit.Memory,
@@ -209,7 +186,7 @@ func main() {
 					MaxOpenFiles: task.Limit.MaxOpenFiles,
 					MaxFileSize:  task.Limit.MaxFileSize,
 					NetworkAllow: task.Limit.NetworkAllow,
-				})
+				}
 			}
 
 			if task.CompareScriptId == nil {
@@ -217,9 +194,16 @@ func main() {
 				return err
 			}
 
-			executor.SetCompareID(*task.CompareScriptId)
-
-			executor.SetTestCaseGroups(testcaseGroupsPbToModel(task.TestCaseGroups))
+			executor, err := executorService.NewExecutor().
+				RunnerID(payload.RunnerID).
+				Files(payload.Files).
+				TestCaseGroups(testcaseGroupsPbToModel(task.GetTestCaseGroups())).
+				Limits(limit).
+				CompareID(task.GetCompareScriptId()).
+				Build()
+			if err != nil {
+				return err
+			}
 
 			bytesResult, err := json.Marshal(models.RunResult{
 				ID:     payload.ID,
@@ -256,10 +240,11 @@ func main() {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
 
+			logger.Infow("Runner finished", "result", result)
 			return nil
 		})
 		if err != nil {
-			logger.Errorw("Cannot consume message from the grade queue", "error", err)
+			logger.Errorw("error", err)
 		}
 	})
 

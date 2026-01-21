@@ -229,7 +229,7 @@ func buildCompareScript(runner *services.IsolateInstance, compare *models.Compar
 		return "", err
 	}
 
-	err = runner.Compile()
+	_, err = runner.Compile()
 	if err != nil {
 		return "", err
 	}
