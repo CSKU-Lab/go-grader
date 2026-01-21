@@ -10,11 +10,3 @@ type RunResult struct {
 	WallTime float32
 	Memory   int32
 }
-
-type StoredRunResult struct {
-	ID       string
-	Status   execution.Status
-	Output   string
-	WallTime float32
-	Memory   int32
-}

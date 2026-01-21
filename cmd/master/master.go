@@ -18,9 +18,7 @@ import (
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	"github.com/CSKU-Lab/go-grader/domain/models"
-	"github.com/CSKU-Lab/go-grader/domain/services"
 	pb "github.com/CSKU-Lab/go-grader/genproto/grader/v1"
-	"github.com/CSKU-Lab/go-grader/internal/adapters/sqlx"
 	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/logging"
 	"github.com/google/uuid"
@@ -30,26 +28,6 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
-
-func storeGradeResult(ctx context.Context, logger *zap.SugaredLogger, service services.ResultService, q messaging.Queue) {
-	err := q.Consume(ctx, "grade_results", 1, func(msg []byte) error {
-		result := &models.GradeResult{}
-		err := json.Unmarshal(msg, result)
-		if err != nil {
-			logger.Errorln("Cannot unmarshal run result message", "error", err)
-			return err
-		}
-		err = service.CreateGradeResult(ctx, result.ID, result)
-		if err != nil {
-			logger.Errorln("Cannot store run result to the database", "error", err)
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		logger.Errorw("Cannot consume run result messages, retrying...", "error", err)
-	}
-}
 
 func main() {
 	logger, loggerCleanup, err := logging.New(os.Getenv("ENV"))
@@ -70,19 +48,13 @@ func main() {
 	}
 	defer rb.Close()
 
-	db := configs.NewDB(logger, os.Getenv("DATABASE_URL"))
-	resultRepo := sqlx.NewSQLXInstance(db)
-	resultService := services.NewResultService(resultRepo)
-
-	go storeGradeResult(context.Background(), logger, resultService, rb)
-
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", env.GetPort()))
 	if err != nil {
 		logger.Fatalln("failed to listen: ", err)
 	}
 
 	s := grpc.NewServer()
-	pb.RegisterGraderServiceServer(s, newGraderGRPCServer(logger, rb, resultService))
+	pb.RegisterGraderServiceServer(s, newGraderGRPCServer(logger, rb))
 
 	reflection.Register(s)
 	logger.Infoln("gRPC ConfigService registered")
@@ -112,17 +84,15 @@ func main() {
 }
 
 type graderGRPCServer struct {
-	logger  *zap.SugaredLogger
-	q       messaging.Queue
-	service services.ResultService
+	logger *zap.SugaredLogger
+	q      messaging.Queue
 	pb.UnimplementedGraderServiceServer
 }
 
-func newGraderGRPCServer(logger *zap.SugaredLogger, q messaging.Queue, service services.ResultService) *graderGRPCServer {
+func newGraderGRPCServer(logger *zap.SugaredLogger, q messaging.Queue) *graderGRPCServer {
 	return &graderGRPCServer{
-		logger:  logger,
-		q:       q,
-		service: service,
+		logger: logger,
+		q:      q,
 	}
 }
 
@@ -221,22 +191,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 	return nil
 }
 
-func (s *graderGRPCServer) GetRunResult(ctx context.Context, req *pb.GetRunResultRequest) (*pb.RunResultResponse, error) {
-	result, err := s.service.GetRunResultByID(ctx, req.GetExecutionId())
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.RunResultResponse{
-		ExecutionId: result.ID,
-		Status:      executionStatusToProtoStatus(result.Status),
-		Output:      result.Output,
-		WallTime:    result.WallTime,
-		Memory:      result.Memory,
-	}, nil
-}
-
-func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradedResponse, error) {
+func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradeResultResponse, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		s.logger.Errorw("Cannot generate UUIDv7", "error", err)
@@ -270,35 +225,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 	}
 	s.logger.Info("Publish message to the queue successfully!")
 
-	return &pb.GradedResponse{
-		ExecutionId: id.String(),
-	}, nil
-}
-
-func (s *graderGRPCServer) GetGradeResult(ctx context.Context, req *pb.GetGradeResultRequest) (*pb.GradeResultResponse, error) {
-	result, err := s.service.GetGradeResultByID(ctx, req.GetExecutionId())
-	if err != nil {
-		return nil, err
-	}
-
-	var testCaseResults = make([]*pb.TestCaseResult, len(result.TestCaseResults))
-	for i, testCaseResult := range result.TestCaseResults {
-		testCaseResults[i] = &pb.TestCaseResult{
-			TestCaseId: testCaseResult.ID,
-			Status:     executionStatusToProtoStatus(testCaseResult.Status),
-			Output:     testCaseResult.Output,
-			Message:    testCaseResult.Message,
-			WallTime:   testCaseResult.WallTime,
-			Memory:     testCaseResult.Memory,
-		}
-	}
-
 	return &pb.GradeResultResponse{
-		ExecutionId:     result.ID,
-		Status:          executionStatusToProtoStatus(result.Status),
-		AvgWallTime:     result.AvgWallTime,
-		AvgMemory:       result.AvgMemory,
-		TestCaseResults: testCaseResults,
 	}, nil
 }
 
