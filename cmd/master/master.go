@@ -12,8 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
@@ -23,6 +21,7 @@ import (
 	"github.com/CSKU-Lab/go-grader/internal/logging"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
@@ -142,7 +141,16 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, "failed to marshal execution payload")
 	}
 
-	err = s.q.Publish(ctx, "run", "run", id.String(), message)
+	qName, err := s.q.CreateQueue(ctx, "result."+id.String())
+	if err != nil {
+		s.logger.Errorw("Cannot create result queue", "error", err)
+		return status.Error(codes.Internal, "failed to create result queue")
+	}
+
+	err = s.q.Publish(ctx, "", "run", &messaging.Derivery{
+		Body:    message,
+		ReplyTo: qName,
+	})
 	if err != nil {
 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 		return status.Error(codes.Internal, "failed to queue execution")
@@ -158,9 +166,9 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	err = s.q.ConsumeFromTopic(ctx, "run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
+	err = s.q.Consume(ctx, qName, 1, func(derivery *messaging.Derivery, exit chan struct{}) error {
 		result := &models.RunResult{}
-		err := json.Unmarshal(msg, result)
+		err := json.Unmarshal(derivery.Body, result)
 		if err != nil {
 			s.logger.Errorln("Cannot unmarshal run result message", "error", err)
 			return err
@@ -191,43 +199,42 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 	return nil
 }
 
-func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradeResultResponse, error) {
-	id, err := uuid.NewV7()
-	if err != nil {
-		s.logger.Errorw("Cannot generate UUIDv7", "error", err)
-		return nil, status.Error(codes.Internal, "failed to generate execution ID")
-	}
-
-	var files = make([]models.File, len(req.Files))
-	for i, file := range req.GetFiles() {
-		files[i] = models.File{
-			Name:    file.GetName(),
-			Content: file.GetContent(),
-		}
-	}
-
-	execution := models.GradeExecution{
-		ID:     id.String(),
-		Files:  files,
-		TaskID: req.GetTaskId(),
-	}
-
-	message, err := json.Marshal(&execution)
-	if err != nil {
-		s.logger.Errorw("Cannot parse execution struct to json", "error", err)
-		return nil, status.Error(codes.Internal, "failed to marshal execution payload")
-	}
-
-	err = s.q.Publish(ctx, "grade", "grade", id.String(), message)
-	if err != nil {
-		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
-		return nil, status.Error(codes.Internal, "failed to queue execution")
-	}
-	s.logger.Info("Publish message to the queue successfully!")
-
-	return &pb.GradeResultResponse{
-	}, nil
-}
+// func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradeResultResponse, error) {
+// 	id, err := uuid.NewV7()
+// 	if err != nil {
+// 		s.logger.Errorw("Cannot generate UUIDv7", "error", err)
+// 		return nil, status.Error(codes.Internal, "failed to generate execution ID")
+// 	}
+//
+// 	var files = make([]models.File, len(req.Files))
+// 	for i, file := range req.GetFiles() {
+// 		files[i] = models.File{
+// 			Name:    file.GetName(),
+// 			Content: file.GetContent(),
+// 		}
+// 	}
+//
+// 	execution := models.GradeExecution{
+// 		ID:     id.String(),
+// 		Files:  files,
+// 		TaskID: req.GetTaskId(),
+// 	}
+//
+// 	message, err := json.Marshal(&execution)
+// 	if err != nil {
+// 		s.logger.Errorw("Cannot parse execution struct to json", "error", err)
+// 		return nil, status.Error(codes.Internal, "failed to marshal execution payload")
+// 	}
+//
+// 	err = s.q.Publish(ctx, "", "grade", id.String(), message)
+// 	if err != nil {
+// 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
+// 		return nil, status.Error(codes.Internal, "failed to queue execution")
+// 	}
+// 	s.logger.Info("Publish message to the queue successfully!")
+//
+// 	return &pb.GradeResultResponse{}, nil
+// }
 
 func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.GenerateTestCasesRequest) (*pb.GenerateTestCasesResponse, error) {
 	var files = make([]models.File, len(req.Files))
@@ -279,16 +286,26 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				return status.Error(codes.Internal, "failed to marshal execution payload")
 			}
 
-			err = s.q.Publish(ctx, "run", "run", id.String(), message)
+			qName, err := s.q.CreateQueue(ctx, "result."+id.String())
+			if err != nil {
+				s.logger.Errorw("Cannot create result queue", "error", err)
+				return status.Error(codes.Internal, "failed to create result queue")
+			}
+
+			err = s.q.Publish(ctx, "", "run", &messaging.Derivery{
+				CorrelationID: id.String(),
+				ReplyTo:       qName,
+				Body:          message,
+			})
 			if err != nil {
 				s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 				return status.Error(codes.Internal, "failed to queue execution")
 			}
 			s.logger.Info("Publish message to the queue successfully!")
 
-			return s.q.ConsumeFromTopic(ctx, "run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
+			return s.q.Consume(ctx, qName, 1, func(derivery *messaging.Derivery, exit chan struct{}) error {
 				result := &models.RunResult{}
-				err := json.Unmarshal(msg, result)
+				err := json.Unmarshal(derivery.Body, result)
 				if err != nil {
 					s.logger.Errorln("Cannot unmarshal run result message", "error", err)
 					return err

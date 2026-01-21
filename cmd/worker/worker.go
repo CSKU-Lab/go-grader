@@ -12,6 +12,7 @@ import (
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
+	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
 	configPB "github.com/CSKU-Lab/go-grader/genproto/config/v1"
@@ -93,10 +94,10 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(message []byte) error {
+		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(derivery *messaging.Derivery, exit chan struct{}) error {
 			payload := &models.RunExecution{}
 
-			err := json.Unmarshal(message, payload)
+			err := json.Unmarshal(derivery.Body, payload)
 			if err != nil {
 				logger.Errorw("Cannot unmarshal message", "error", err)
 				return err
@@ -132,79 +133,11 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "run_results", "result."+payload.ID, payload.ID, bytesResult)
-			if err != nil {
-				logger.Errorw("Cannot publish run result to the queue", "error", err)
-			}
-
-			result, err := executor.Run()
-			if err != nil {
-				logger.Errorw("Error from runner", "error", err)
-				return err
-			}
-
-			result.ID = payload.ID
-
-			bytesResult, err = json.Marshal(result)
-			if err != nil {
-				logger.Errorw("Cannot marshal run result", "error", err)
-			}
-
-			err = q.Publish(ctx, "run_results", "result."+payload.ID, payload.ID, bytesResult)
-			if err != nil {
-				logger.Errorw("Cannot publish run result to the queue", "error", err)
-			}
-
-			logger.Infow("Runner finished", "result", result)
-			return nil
-		})
-		if err != nil {
-			logger.Errorw("Cannot consume message from the run queue", "error", err)
-		}
-	})
-
-	wg.Go(func() {
-		err := q.Consume(ctx, "grade", constants.MAX_QUEUES, func(message []byte) error {
-			payload := &models.RunExecution{}
-
-			err := json.Unmarshal(message, payload)
-			if err != nil {
-				logger.Errorw("Cannot unmarshal message", "error", err)
-				return err
-			}
-
-			executor := executorService.NewExecutor()
-			defer executor.Cleanup()
-
-			if err := executor.SetRunner(payload.RunnerID); err != nil {
-				logger.Errorw("Cannot set runner", "error", err)
-				return err
-			}
-
-			if err := executor.SetFiles(payload.Files); err != nil {
-				logger.Errorw("Cannot set files", "error", err)
-				return err
-			}
-
-			if err := executor.SetInput(payload.Input); err != nil {
-				logger.Errorw("Cannot set input", "error", err)
-				return err
-			}
-
-			if payload.Limit != nil {
-				executor.SetLimits(payload.Limit)
-			}
-
-			bytesResult, err := json.Marshal(models.RunResult{
-				ID:     payload.ID,
-				Status: execution.RUNNING,
+			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+				Body:          bytesResult,
+				CorrelationID: payload.ID,
 			})
 			if err != nil {
-				logger.Errorw("Cannot marshal run result", "error", err)
-			}
-
-			err = q.Publish(ctx, "run_results", "result."+payload.ID, payload.ID, bytesResult)
-			if err != nil {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
 
@@ -221,7 +154,10 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "run_results", "result."+payload.ID, payload.ID, bytesResult)
+			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+				CorrelationID: payload.ID,
+				Body:          bytesResult,
+			})
 			if err != nil {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
