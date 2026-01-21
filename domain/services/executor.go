@@ -176,6 +176,11 @@ func (r *executor) Run() (*models.RunResult, error) {
 		return nil, err
 	}
 
+	err = instance.Cleanup()
+	if err != nil {
+		return nil, err
+	}
+
 	runResult := &models.RunResult{
 		WallTime: metadata.WallTime,
 		Memory:   metadata.Memory,
