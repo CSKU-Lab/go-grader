@@ -142,7 +142,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, "failed to marshal execution payload")
 	}
 
-	err = s.q.PublishWithContext(ctx, "run", "run", id.String(), message)
+	err = s.q.Publish(ctx, "run", "run", id.String(), message)
 	if err != nil {
 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 		return status.Error(codes.Internal, "failed to queue execution")
@@ -218,7 +218,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 		return nil, status.Error(codes.Internal, "failed to marshal execution payload")
 	}
 
-	err = s.q.PublishWithContext(ctx, "grade", "grade", id.String(), message)
+	err = s.q.Publish(ctx, "grade", "grade", id.String(), message)
 	if err != nil {
 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 		return nil, status.Error(codes.Internal, "failed to queue execution")
@@ -279,7 +279,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				return status.Error(codes.Internal, "failed to marshal execution payload")
 			}
 
-			err = s.q.PublishWithContext(ctx, "run", "run", id.String(), message)
+			err = s.q.Publish(ctx, "run", "run", id.String(), message)
 			if err != nil {
 				s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
 				return status.Error(codes.Internal, "failed to queue execution")

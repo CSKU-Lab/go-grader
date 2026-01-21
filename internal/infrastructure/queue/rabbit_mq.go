@@ -98,7 +98,7 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 	}, nil
 }
 
-func (r *rabbitmq) PublishWithContext(ctx context.Context, topic string, key string, correlationID string, message []byte) error {
+func (r *rabbitmq) Publish(ctx context.Context, topic string, key string, correlationID string, message []byte) error {
 	ch, err := r.conn.Channel()
 	if err != nil {
 		return err
