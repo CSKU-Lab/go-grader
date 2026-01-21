@@ -204,7 +204,11 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 				Status: execution.COMPILE_FAILED,
 			}, nil
 		}
-		instance.Cleanup()
+
+		err = instance.Cleanup()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	totalWallTime := float32(0)
@@ -285,10 +289,15 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 				}
 			}
 
+			testCaseResult.Output = output
+
 			metadata, err := instance.GetMetadata()
 			if err != nil {
 				return err
 			}
+
+			testCaseResult.WallTime = metadata.WallTime
+			testCaseResult.Memory = metadata.Memory
 
 			err = instance.Cleanup()
 			if err != nil {
@@ -316,6 +325,11 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 				}
 
 				resultMetadata.isFailed = true
+			}
+
+			if resultMetadata.isFailed {
+				testCaseResults = append(testCaseResults, testCaseResult)
+				return nil
 			}
 
 			instance = r.isolateService.NewInstance()
@@ -353,6 +367,8 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 			if compareResult == "" {
 				testCaseResult.Status = execution.RUN_PASSED
 			} else {
+
+				testCaseResult.Message = compareResult
 				resultMetadata.isFailed = true
 			}
 
