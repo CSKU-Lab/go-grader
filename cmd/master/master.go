@@ -188,7 +188,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	err = s.q.ConsumeFromTopic(ctx, "topic.run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
+	err = s.q.ConsumeFromTopic(ctx, "run_results", "result."+id.String(), 1, func(msg []byte, exit chan struct{}) error {
 		result := &models.RunResult{}
 		err := json.Unmarshal(msg, result)
 		if err != nil {
