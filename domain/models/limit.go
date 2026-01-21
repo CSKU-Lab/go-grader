@@ -16,8 +16,8 @@ type Limit struct {
 	CPUExtraTime float32 `json:"cpuExtraTime" arg:"--extra-time"`
 	WallTime     float32 `json:"wallTime" arg:"--wall-time"`
 	Memory       int32   `json:"memory" arg:"--mem"`
-	Stack        int     `json:"stack" arg:"--stack"`
-	MaxOpenFiles int     `json:"maxOpenFiles" arg:"--open-files"`
+	Stack        int32   `json:"stack" arg:"--stack"`
+	MaxOpenFiles int32   `json:"maxOpenFiles" arg:"--open-files"`
 	MaxFileSize  float32 `json:"maxFileSize" arg:"--fsize"`
 	NetworkAllow bool    `json:"allowNetwork" arg:"--share-net"`
 }

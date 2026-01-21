@@ -44,8 +44,8 @@ func main() {
 	configGRPC, closeConfig := initConfigServerClient(logger, env.GetConfigServerURL())
 	defer closeConfig()
 
-	// taskGRPC, closeTask := initTaskServerClient(logger, env.GetTaskServerURL())
-	// defer closeTask()
+	taskGRPC, closeTask := initTaskServerClient(logger, env.GetTaskServerURL())
+	defer closeTask()
 
 	var runnerRes *configPB.GetRunnersResponse
 	for i := range 5 {
@@ -170,6 +170,99 @@ func main() {
 		}
 	})
 
+	wg.Go(func() {
+		err := q.Consume(ctx, "grade", constants.MAX_QUEUES, func(derivery *messaging.Derivery, exit chan struct{}) error {
+			payload := &models.GradeExecution{}
+
+			err := json.Unmarshal(derivery.Body, payload)
+			if err != nil {
+				logger.Errorw("Cannot unmarshal message", "error", err)
+				return err
+			}
+
+			executor := executorService.NewExecutor()
+			defer executor.Cleanup()
+
+			if err := executor.SetRunner(payload.RunnerID); err != nil {
+				logger.Errorw("Cannot set runner", "error", err)
+				return err
+			}
+
+			if err := executor.SetFiles(payload.Files); err != nil {
+				logger.Errorw("Cannot set files", "error", err)
+				return err
+			}
+
+			task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{Id: payload.TaskID})
+			if err != nil {
+				logger.Errorw("Cannot get task from gRPC server", "error", err)
+				return err
+			}
+
+			if task.Limit != nil {
+				executor.SetLimits(&models.Limit{
+					CPUTime:      task.Limit.CpuTime,
+					CPUExtraTime: task.Limit.CpuExtraTime,
+					Memory:       task.Limit.Memory,
+					WallTime:     task.Limit.WallTime,
+					Stack:        task.Limit.Stack,
+					MaxOpenFiles: task.Limit.MaxOpenFiles,
+					MaxFileSize:  task.Limit.MaxFileSize,
+					NetworkAllow: task.Limit.NetworkAllow,
+				})
+			}
+
+			if task.CompareScriptId == nil {
+				logger.Errorw("Compare script ID is nil in task", "task_id", task.Id)
+				return err
+			}
+
+			executor.SetCompareID(*task.CompareScriptId)
+
+			executor.SetTestCaseGroups(testcaseGroupsPbToModel(task.TestCaseGroups))
+
+			bytesResult, err := json.Marshal(models.RunResult{
+				ID:     payload.ID,
+				Status: execution.RUNNING,
+			})
+			if err != nil {
+				logger.Errorw("Cannot marshal run result", "error", err)
+			}
+
+			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+				Body:          bytesResult,
+				CorrelationID: payload.ID,
+			})
+			if err != nil {
+				logger.Errorw("Cannot publish run result to the queue", "error", err)
+			}
+
+			result, err := executor.Grade()
+			if err != nil {
+				logger.Errorw("Error from runner", "error", err)
+				return err
+			}
+
+			bytesResult, err = json.Marshal(result)
+			if err != nil {
+				logger.Errorw("Cannot marshal run result", "error", err)
+			}
+
+			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+				CorrelationID: payload.ID,
+				Body:          bytesResult,
+			})
+			if err != nil {
+				logger.Errorw("Cannot publish run result to the queue", "error", err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			logger.Errorw("Cannot consume message from the grade queue", "error", err)
+		}
+	})
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
@@ -248,4 +341,26 @@ func comparePbToModel(compares []*configPB.CompareResponse) []models.CompareConf
 		})
 	}
 	return _compares
+}
+
+func testcaseGroupsPbToModel(tcs []*taskPB.TestCaseGroup) []models.TestCaseGroup {
+	testcases := make([]models.TestCaseGroup, 0, len(tcs))
+	for _, tc := range tcs {
+		testcase := models.TestCaseGroup{
+			ID:        tc.GetId(),
+			Score:     tc.GetScore(),
+			TestCases: make([]models.TestCase, 0, len(tc.GetTestCases())),
+		}
+
+		for _, t := range tc.GetTestCases() {
+			testcase.TestCases = append(testcase.TestCases, models.TestCase{
+				ID:     t.GetId(),
+				Input:  t.GetInput(),
+				Output: t.GetOutput(),
+			})
+		}
+
+		testcases = append(testcases, testcase)
+	}
+	return testcases
 }

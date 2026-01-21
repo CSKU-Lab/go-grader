@@ -120,8 +120,8 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 			CPUExtraTime: l.GetCpuExtraTime(),
 			WallTime:     l.GetWallTime(),
 			Memory:       l.GetMemory(),
-			Stack:        int(l.GetStack()),
-			MaxOpenFiles: int(l.GetMaxOpenFiles()),
+			Stack:        l.GetStack(),
+			MaxOpenFiles: l.GetMaxOpenFiles(),
 			MaxFileSize:  l.GetMaxFileSize(),
 			NetworkAllow: l.GetNetworkAllow(),
 		}
@@ -199,42 +199,80 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 	return nil
 }
 
-// func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradeResultResponse, error) {
-// 	id, err := uuid.NewV7()
-// 	if err != nil {
-// 		s.logger.Errorw("Cannot generate UUIDv7", "error", err)
-// 		return nil, status.Error(codes.Internal, "failed to generate execution ID")
-// 	}
-//
-// 	var files = make([]models.File, len(req.Files))
-// 	for i, file := range req.GetFiles() {
-// 		files[i] = models.File{
-// 			Name:    file.GetName(),
-// 			Content: file.GetContent(),
-// 		}
-// 	}
-//
-// 	execution := models.GradeExecution{
-// 		ID:     id.String(),
-// 		Files:  files,
-// 		TaskID: req.GetTaskId(),
-// 	}
-//
-// 	message, err := json.Marshal(&execution)
-// 	if err != nil {
-// 		s.logger.Errorw("Cannot parse execution struct to json", "error", err)
-// 		return nil, status.Error(codes.Internal, "failed to marshal execution payload")
-// 	}
-//
-// 	err = s.q.Publish(ctx, "", "grade", id.String(), message)
-// 	if err != nil {
-// 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
-// 		return nil, status.Error(codes.Internal, "failed to queue execution")
-// 	}
-// 	s.logger.Info("Publish message to the queue successfully!")
-//
-// 	return &pb.GradeResultResponse{}, nil
-// }
+func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb.GradeResultResponse, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		s.logger.Errorw("Cannot generate UUIDv7", "error", err)
+		return nil, status.Error(codes.Internal, "failed to generate execution ID")
+	}
+
+	var files = make([]models.File, len(req.Files))
+	for i, file := range req.GetFiles() {
+		files[i] = models.File{
+			Name:    file.GetName(),
+			Content: file.GetContent(),
+		}
+	}
+
+	payload := models.GradeExecution{
+		ID:       id.String(),
+		Files:    files,
+		TaskID:   req.GetTaskId(),
+		RunnerID: req.GetRunnerId(),
+	}
+
+	message, err := json.Marshal(&payload)
+	if err != nil {
+		s.logger.Errorw("Cannot parse execution struct to json", "error", err)
+		return nil, status.Error(codes.Internal, "failed to marshal execution payload")
+	}
+
+	qName, err := s.q.CreateQueue(ctx, "grade."+id.String())
+	if err != nil {
+		s.logger.Errorw("Cannot create result queue", "error", err)
+		return nil, status.Error(codes.Internal, "failed to create result queue")
+	}
+
+	err = s.q.Publish(ctx, "", "grade", &messaging.Derivery{
+		CorrelationID: id.String(),
+		ReplyTo:       qName,
+		Body:          message,
+	})
+	if err != nil {
+		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
+		return nil, status.Error(codes.Internal, "failed to queue execution")
+	}
+	s.logger.Info("Publish message to the queue successfully!")
+
+	result := &models.GradeResult{}
+	err = s.q.Consume(ctx, qName, 1, func(derivery *messaging.Derivery, exit chan struct{}) error {
+		err := json.Unmarshal(derivery.Body, result)
+		if err != nil {
+			s.logger.Errorln("Cannot unmarshal grade result message", "error", err)
+			return err
+		}
+		s.logger.Infof("Received grade result for execution ID %s", id.String())
+
+		if result.Status != execution.QUEUED && result.Status != execution.RUNNING {
+			exit <- struct{}{}
+		}
+		return nil
+	})
+	if err != nil {
+		s.logger.Errorw("Error during grading", "error", err)
+		return nil, err
+	}
+
+	tcgsPB := testCaseGroupsResultToProto(result.TestCaseGroupResults)
+
+	return &pb.GradeResultResponse{
+		ExecutionId:    id.String(),
+		TestCaseGroups: tcgsPB,
+		Status:         executionStatusToProtoStatus(result.Status),
+		AvgWallTime:    result.AvgWallTime,
+		AvgMemory:      result.AvgMemory,
+	}, nil
+}
 
 func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.GenerateTestCasesRequest) (*pb.GenerateTestCasesResponse, error) {
 	var files = make([]models.File, len(req.Files))
@@ -253,8 +291,8 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 			CPUExtraTime: l.GetCpuExtraTime(),
 			WallTime:     l.GetWallTime(),
 			Memory:       l.GetMemory(),
-			Stack:        int(l.GetStack()),
-			MaxOpenFiles: int(l.GetMaxOpenFiles()),
+			Stack:        l.GetStack(),
+			MaxOpenFiles: l.GetMaxOpenFiles(),
 			MaxFileSize:  l.GetMaxFileSize(),
 			NetworkAllow: l.GetNetworkAllow(),
 		}
@@ -376,4 +414,29 @@ func executionStatusToProtoStatus(status execution.Status) pb.ExecutionStatus {
 	default:
 		return pb.ExecutionStatus_STATUS_UNSPECIFIED
 	}
+}
+
+func testCaseGroupsResultToProto(tcgModel []models.TestCaseGroupResult) []*pb.TestCaseGroup {
+	tcgPB := make([]*pb.TestCaseGroup, 0, len(tcgModel))
+	for _, tcg := range tcgModel {
+		testCases := make([]*pb.TestCaseResult, 0, len(tcg.Results))
+		for _, tc := range tcg.Results {
+			testCases = append(testCases, &pb.TestCaseResult{
+				Id:       tc.ID,
+				Status:   executionStatusToProtoStatus(tc.Status),
+				Message:  tc.Message,
+				WallTime: tc.WallTime,
+				Memory:   tc.Memory,
+				Output:   tc.Output,
+			})
+		}
+
+		tcgPB = append(tcgPB, &pb.TestCaseGroup{
+			Id:        tcg.ID,
+			Score:     tcg.Score,
+			TestCases: testCases,
+		})
+	}
+
+	return tcgPB
 }

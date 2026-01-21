@@ -5,3 +5,9 @@ type TestCase struct {
 	Input  string
 	Output string
 }
+
+type TestCaseGroup struct {
+	ID        string
+	TestCases []TestCase
+	Score     int32
+}

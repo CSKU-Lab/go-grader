@@ -44,7 +44,7 @@ type executor struct {
 	comparePath    string
 	limits         *models.Limit
 	hasInput       bool
-	testcases      []models.TestCase
+	testCaseGroups []models.TestCaseGroup
 	logger         *zap.SugaredLogger
 }
 
@@ -54,7 +54,7 @@ type Executor interface {
 	SetFiles(files []models.File) error
 	SetInput(input string) error
 	SetLimits(limits *models.Limit)
-	SetTestCases(testCases []models.TestCase)
+	SetTestCaseGroups(testCases []models.TestCaseGroup)
 	SetCompareID(ID string)
 	Run() (*models.RunResult, error)
 	Grade() (*models.GradeResult, error)
@@ -151,11 +151,11 @@ func (r *executor) SetLimits(limits *models.Limit) {
 	r.limits = limits
 }
 
-func (r *executor) SetTestCases(testCases []models.TestCase) {
+func (r *executor) SetTestCaseGroups(testCaseGroups []models.TestCaseGroup) {
 	if r.comparePath == "" {
 		r.logger.Fatal("You need to set compare ID before setting test cases")
 	}
-	r.testcases = testCases
+	r.testCaseGroups = testCaseGroups
 }
 
 func (r *executor) SetCompareID(ID string) {
@@ -237,35 +237,78 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 	totalWallTime := float32(0)
 	totalMemory := int32(0)
 	gradedStatus := execution.RUN_PASSED
-	var testCaseResults []models.TestCaseResult
-	for _, testCase := range r.testcases {
-		if err := r.SetInput(testCase.Input); err != nil {
-			return nil, fmt.Errorf("failed to set input: %w", err)
+	testCaseGroupResults := make([]models.TestCaseGroupResult, 0, len(r.testCaseGroups))
+	for _, group := range r.testCaseGroups {
+		groupResults, metadata, err := r.generateTestCaseResults(group.TestCases)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate test case results: %w", err)
 		}
 
-		testCaseResult := models.TestCaseResult{
-			ID:     testCase.ID,
-			Status: execution.RUN_FAILED,
+		score := int32(0)
+		if !metadata.isFailed {
+			score = group.Score
+		}
+
+		testCaseGroupResults = append(testCaseGroupResults, models.TestCaseGroupResult{
+			ID:      group.ID,
+			Results: groupResults,
+			Score:   score,
+		})
+
+		totalWallTime += metadata.totalWallTime
+		totalMemory += metadata.totalMemory
+
+		if metadata.isFailed {
+			gradedStatus = execution.RUN_FAILED
+		}
+	}
+
+	tcsCount := 0
+	for _, group := range r.testCaseGroups {
+		tcsCount += len(group.TestCases)
+	}
+
+	return &models.GradeResult{
+		Status:               gradedStatus,
+		TestCaseGroupResults: testCaseGroupResults,
+		AvgWallTime:          totalWallTime / float32(tcsCount),
+		AvgMemory:            totalMemory / int32(tcsCount),
+	}, nil
+}
+
+type resultMetadata struct {
+	totalWallTime float32
+	totalMemory   int32
+	isFailed      bool
+}
+
+func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.TestCaseResult, *resultMetadata, error) {
+	metadata := &resultMetadata{}
+	testCaseResults := make([]models.TestCaseResult, 0, len(tcs))
+	for _, tc := range tcs {
+		if err := r.SetInput(tc.Input); err != nil {
+			return nil, nil, fmt.Errorf("failed to set input: %w", err)
 		}
 
 		result, err := r.run()
 		if err != nil {
-			return nil, fmt.Errorf("failed to run: %w", err)
+			return nil, nil, fmt.Errorf("failed to run: %w", err)
 		}
 
-		testCaseResult.StdOut = result.StdOut
-		testCaseResult.StdErr = result.StdErr
-		testCaseResult.WallTime = result.Metadata.WallTime
-		testCaseResult.Memory = result.Metadata.Memory
+		metadata.totalWallTime += result.Metadata.WallTime
+		metadata.totalMemory += result.Metadata.Memory
 
-		totalWallTime += result.Metadata.WallTime
-		totalMemory += result.Metadata.Memory
-
-		isFailed := false
-
+		output := result.StdOut
 		if result.StdErr != "" {
-			testCaseResult.Message = result.StdErr
-			isFailed = true
+			output = result.StdErr
+		}
+
+		testCaseResult := models.TestCaseResult{
+			ID:       tc.ID,
+			Status:   execution.RUN_FAILED,
+			Output:   output,
+			WallTime: result.Metadata.WallTime,
+			Memory:   result.Metadata.Memory,
 		}
 
 		if result.Metadata.FailedStatus != "" {
@@ -285,39 +328,29 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 				testCaseResult.Status = execution.MEMORY_LIMIT_EXCEEDED
 			}
 
-			isFailed = true
+			metadata.isFailed = true
 		}
 
 		err = r.instance.CreateFile("output", result.StdOut, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create output file: %w", err)
+			return nil, nil, fmt.Errorf("failed to create output file: %w", err)
 		}
 
-		compareResult, err := r.compare(testCase.Output)
+		compareResult, err := r.compare(tc.Output)
 		if err != nil {
-			return nil, fmt.Errorf("failed to compare: %w", err)
+			return nil, nil, fmt.Errorf("failed to compare: %w", err)
 		}
 
 		if compareResult == "" {
 			testCaseResult.Status = execution.RUN_PASSED
 		} else {
-			isFailed = true
-		}
-
-		if isFailed {
-			if gradedStatus != execution.RUN_FAILED {
-				gradedStatus = execution.RUN_FAILED
-			}
+			metadata.isFailed = true
 		}
 
 		testCaseResults = append(testCaseResults, testCaseResult)
 
 		r.hasInput = false
 	}
-	return &models.GradeResult{
-		Status:          gradedStatus,
-		TestCaseResults: testCaseResults,
-		AvgWallTime:     totalWallTime / float32(len(r.testcases)),
-		AvgMemory:       totalMemory / int32(len(r.testcases)),
-	}, nil
+
+	return testCaseResults, metadata, nil
 }

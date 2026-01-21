@@ -1,9 +1,10 @@
 package models
 
 type GradeExecution struct {
-	ID     string `json:"id"`
-	Files  []File `json:"files"`
-	TaskID string `json:"task_id"`
+	ID       string `json:"id"`
+	Files    []File `json:"files"`
+	TaskID   string `json:"task_id"`
+	RunnerID string `json:"runner_id"`
 }
 
 type RunExecution struct {
