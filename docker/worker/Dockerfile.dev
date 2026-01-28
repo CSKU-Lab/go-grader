@@ -1,26 +1,28 @@
 FROM cskulab/isolate-with-compilers
 
+ARG TARGETARCH
 
 RUN apt update && apt install -y wget
 
-
-RUN wget https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
-
-
-RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz
-
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+  GO_ARCH="amd64"; \
+  elif [ "$TARGETARCH" = "arm64" ]; then \
+  GO_ARCH="arm64"; \
+  else \
+  echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+  fi && \
+  wget https://go.dev/dl/go1.25.5.linux-${GO_ARCH}.tar.gz && \
+  rm -rf /usr/local/go && \
+  tar -C /usr/local -xzf go1.25.5.linux-${GO_ARCH}.tar.gz && \
+  rm go1.25.5.linux-${GO_ARCH}.tar.gz
 
 ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
-
 
 RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
-
-# Copy go.mod and go.sum first to leverage Docker cache
 COPY go.mod go.sum ./
 RUN go mod download
-
 
 ENTRYPOINT ["air", "-c", "./docker/worker/.air.toml"]
