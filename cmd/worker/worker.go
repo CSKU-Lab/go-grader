@@ -124,6 +124,8 @@ func main() {
 					return err
 				}
 
+				setup.Cleanup(logger)
+
 				runners := runnerPbToModel(runnerRes.Runners)
 				compares := comparePbToModel(compareRes.Compares)
 
@@ -266,11 +268,6 @@ func main() {
 					MaxFileSize:  task.Limit.MaxFileSize,
 					NetworkAllow: task.Limit.NetworkAllow,
 				}
-			}
-
-			if task.CompareScriptId == nil {
-				logger.Errorw("Compare script ID is nil in task", "task_id", task.Id)
-				return err
 			}
 
 			exService := *executorHolder.Get()

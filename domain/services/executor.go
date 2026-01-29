@@ -193,7 +193,9 @@ func (r *executor) Run() (*models.RunResult, error) {
 
 func (r *executor) Grade() (*models.GradeResult, error) {
 	if r.compare == nil {
-		return nil, errors.New("compare must be provided for grading")
+		return &models.GradeResult{
+			Status: execution.GRADER_ERROR,
+		}, nil
 	}
 
 	if r.runner.NeedCompile {
@@ -240,9 +242,9 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 		}
 	}
 
-	tcsCount := 0
+	tcsCount := 1
 	for _, group := range r.testCaseGroups {
-		tcsCount += len(group.TestCases)
+		tcsCount += len(group.TestCases) - 1
 	}
 
 	return &models.GradeResult{
