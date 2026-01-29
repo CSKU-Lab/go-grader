@@ -35,6 +35,11 @@ func NewRabbitMQ(logger *zap.SugaredLogger, connStr string) (messaging.Queue, er
 		return nil, err
 	}
 
+	_, err = ch.QueueDeclare("broadcast", true, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return &rabbitmq{
 		conn:   conn,
 		logger: logger,

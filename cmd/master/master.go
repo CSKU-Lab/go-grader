@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/CSKU-Lab/go-grader/configs"
+	"github.com/CSKU-Lab/go-grader/domain/constants/broadcast"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	"github.com/CSKU-Lab/go-grader/domain/models"
@@ -26,6 +27,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func main() {
@@ -95,6 +97,34 @@ func newGraderGRPCServer(logger *zap.SugaredLogger, q messaging.Queue) *graderGR
 	}
 }
 
+func protoActionToSystemAction(pbAction pb.BroadcastAction) broadcast.Action {
+	switch pbAction {
+	case pb.BroadcastAction_REFETCH_CONFIG:
+		return broadcast.REFETCH_CONFIG
+	default:
+		return "UNKNOWN"
+	}
+}
+
+func (s *graderGRPCServer) Broadcast(ctx context.Context, req *pb.BroadcastRequest) (*emptypb.Empty, error) {
+	action := protoActionToSystemAction(req.GetAction())
+	body, err := json.Marshal(action)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to marshal broadcast message")
+	}
+
+	err = s.q.Publish(ctx, "", "broadcast", &messaging.Derivery{
+		Body: body,
+	})
+	if err != nil {
+		s.logger.Errorw("Cannot publish message to the broadcast queue", "error", err)
+		return nil, status.Error(codes.Internal, "failed to broadcast message")
+	}
+	s.logger.Info("Broadcast message to the queue successfully!")
+
+	return &emptypb.Empty{}, nil
+}
+
 func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingServer[pb.RunResultResponse]) error {
 	ctx := stream.Context()
 
@@ -104,7 +134,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, "failed to generate execution ID")
 	}
 
-	var files = make([]models.File, len(req.Files))
+	files := make([]models.File, len(req.Files))
 	for i, file := range req.GetFiles() {
 		files[i] = models.File{
 			Name:    file.GetName(),
@@ -201,7 +231,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 		return nil, status.Error(codes.Internal, "failed to generate execution ID")
 	}
 
-	var files = make([]models.File, len(req.Files))
+	files := make([]models.File, len(req.Files))
 	for i, file := range req.GetFiles() {
 		files[i] = models.File{
 			Name:    file.GetName(),
@@ -270,7 +300,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 }
 
 func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.GenerateTestCasesRequest) (*pb.GenerateTestCasesResponse, error) {
-	var files = make([]models.File, len(req.Files))
+	files := make([]models.File, len(req.Files))
 	for i, file := range req.GetFiles() {
 		files[i] = models.File{
 			Name:    file.GetName(),

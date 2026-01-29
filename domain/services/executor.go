@@ -38,7 +38,7 @@ type ExecutorBuilder interface {
 	Limits(limits *models.Limit) ExecutorBuilder
 	TestCaseGroups(testCases []models.TestCaseGroup) ExecutorBuilder
 	CompareID(ID string) ExecutorBuilder
-	Build() (*executor, error)
+	Build() (*executor, execution.Status)
 }
 
 type executor struct {
@@ -106,9 +106,9 @@ func (r *executorBuilder) TestCaseGroups(testCaseGroups []models.TestCaseGroup) 
 	return r
 }
 
-func (r *executorBuilder) Build() (*executor, error) {
+func (r *executorBuilder) Build() (*executor, execution.Status) {
 	if r.files == nil {
-		return nil, errors.New("files must be provided")
+		return nil, execution.FILE_NOT_FOUND
 	}
 
 	exec := &executor{
@@ -122,7 +122,7 @@ func (r *executorBuilder) Build() (*executor, error) {
 
 	runner, err := r.runnerService.GetByID(r.runnerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get runner: %w", err)
+		return nil, execution.GRADER_ERROR
 	}
 
 	exec.runner = runner
@@ -130,12 +130,12 @@ func (r *executorBuilder) Build() (*executor, error) {
 	if r.compareID != "" {
 		compare, err := r.compareService.GetByID(r.compareID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get compare: %w", err)
+			return nil, execution.GRADER_ERROR
 		}
 		exec.compare = compare
 	}
 
-	return exec, nil
+	return exec, execution.BUILD_PASSED
 }
 
 func (r *executor) Run() (*models.RunResult, error) {
@@ -375,7 +375,6 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 			testCaseResults = append(testCaseResults, testCaseResult)
 			return nil
 		})
-
 	}
 
 	err := eg.Wait()

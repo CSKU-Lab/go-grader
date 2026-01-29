@@ -11,6 +11,7 @@ import (
 
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants"
+	"github.com/CSKU-Lab/go-grader/domain/constants/broadcast"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	"github.com/CSKU-Lab/go-grader/domain/models"
@@ -38,7 +39,6 @@ func main() {
 	}()
 
 	env := configs.NewEnv(logger)
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	configGRPC, closeConfig := initConfigServerClient(logger, env.GetConfigServerURL())
@@ -76,22 +76,82 @@ func main() {
 	runners := runnerPbToModel(runnerRes.Runners)
 	compares := comparePbToModel(compareRes.Compares)
 
-	setup.Init(logger, runners, compares)
-
 	q, err := queue.NewRabbitMQ(logger, env.GetQueueServerURL())
 	if err != nil {
 		logger.Fatalw("Cannot initialize RabbitMQ", "error", err)
 	}
 
-	runnerService := services.NewRunnerService(logger)
-	compareService := services.NewCompareService(logger)
+	setup.Init(logger, runners, compares)
 
 	isolateService := services.NewIsolateService(ctx, logger)
-	executorService := services.NewExecutorService(logger, isolateService, runnerService, compareService)
+	runnerService := services.NewRunnerService(logger)
+	compareService := services.NewCompareService(logger)
+	executorService := services.NewExecutorService(
+		logger,
+		isolateService,
+		runnerService,
+		compareService,
+	)
+
+	executorHolder := services.NewExecutorHolder(&executorService)
 
 	logger.Info("Worker is ready to start working 🤖...")
 
 	var wg sync.WaitGroup
+
+	wg.Go(func() {
+		err := q.Consume(ctx, "broadcast", 1, func(d *messaging.Derivery, exit chan struct{}) error {
+			var action broadcast.Action
+
+			if err := json.Unmarshal(d.Body, &action); err != nil {
+				logger.Errorw("Cannot unmarshal broadcast message", "error", err)
+				return err
+			}
+
+			switch action {
+			case broadcast.REFETCH_CONFIG:
+				logger.Info("Received broadcast: refetch config")
+
+				runnerRes, err := configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
+				if err != nil {
+					logger.Errorw("Failed to refetch runners", "error", err)
+					return err
+				}
+
+				compareRes, err := configGRPC.GetCompares(ctx, &emptypb.Empty{})
+				if err != nil {
+					logger.Errorw("Failed to refetch compares", "error", err)
+					return err
+				}
+
+				runners := runnerPbToModel(runnerRes.Runners)
+				compares := comparePbToModel(compareRes.Compares)
+
+				setup.Init(logger, runners, compares)
+
+				newRunnerService := services.NewRunnerService(logger)
+				newCompareService := services.NewCompareService(logger)
+
+				newExecutor := services.NewExecutorService(
+					logger,
+					isolateService,
+					newRunnerService,
+					newCompareService,
+				)
+
+				executorHolder.Swap(&newExecutor)
+
+				logger.Info("Config successfully reloaded 🚀")
+			default:
+				logger.Warnw("Unknown broadcast message", "type", action)
+			}
+
+			return nil
+		})
+		if err != nil {
+			logger.Errorw("broadcast consumer error", "error", err)
+		}
+	})
 
 	wg.Go(func() {
 		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(derivery *messaging.Derivery, exit chan struct{}) error {
@@ -103,15 +163,34 @@ func main() {
 				return err
 			}
 
-			executor, err := executorService.NewExecutor().
+			logger.Infow("Received run request", "payload", payload.RunnerID)
+
+			exService := *executorHolder.Get()
+			executor, status := exService.NewExecutor().
 				RunnerID(payload.RunnerID).
 				Files(payload.Files).
 				Input(payload.Input).
 				Limits(payload.Limit).
 				Build()
 
-			if err != nil {
-				return err
+			switch status == execution.BUILD_PASSED {
+			case false:
+				bytesResult, err := json.Marshal(models.RunResult{
+					ID:     payload.ID,
+					Status: status,
+				})
+				if err != nil {
+					logger.Errorw("Cannot marshal run result", "error", err)
+				}
+
+				err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+					Body:          bytesResult,
+					CorrelationID: payload.ID,
+				})
+				if err != nil {
+					logger.Errorw("Cannot publish run result to the queue", "error", err)
+				}
+				return nil
 			}
 
 			bytesResult, err := json.Marshal(models.RunResult{
@@ -194,15 +273,33 @@ func main() {
 				return err
 			}
 
-			executor, err := executorService.NewExecutor().
+			exService := *executorHolder.Get()
+			executor, status := exService.NewExecutor().
 				RunnerID(payload.RunnerID).
 				Files(payload.Files).
 				TestCaseGroups(testcaseGroupsPbToModel(task.GetTestCaseGroups())).
 				Limits(limit).
 				CompareID(task.GetCompareScriptId()).
 				Build()
-			if err != nil {
-				return err
+
+			switch status == execution.BUILD_PASSED {
+			case false:
+				bytesResult, err := json.Marshal(models.RunResult{
+					ID:     payload.ID,
+					Status: status,
+				})
+				if err != nil {
+					logger.Errorw("Cannot marshal run result", "error", err)
+				}
+
+				err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+					Body:          bytesResult,
+					CorrelationID: payload.ID,
+				})
+				if err != nil {
+					logger.Errorw("Cannot publish run result to the queue", "error", err)
+				}
+				return nil
 			}
 
 			bytesResult, err := json.Marshal(models.RunResult{
