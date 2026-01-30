@@ -1,6 +1,6 @@
 module github.com/CSKU-Lab/go-grader
 
-go 1.25.1
+go 1.25.5
 
 require (
 	github.com/google/uuid v1.6.0
@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/CSKU-Lab/queue v0.1.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/text v0.21.0 // indirect

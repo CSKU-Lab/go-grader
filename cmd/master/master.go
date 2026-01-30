@@ -15,11 +15,10 @@ import (
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants/broadcast"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
-	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	pb "github.com/CSKU-Lab/go-grader/genproto/grader/v1"
-	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/logging"
+	"github.com/CSKU-Lab/queue"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -43,7 +42,7 @@ func main() {
 
 	env := configs.NewEnv(logger)
 
-	rb, err := queue.NewRabbitMQ(logger, env.GetQueueServerURL())
+	rb, err := queue.NewRabbitMQ(env.GetQueueServerURL())
 	if err != nil {
 		logger.Fatalw("Cannot initialize RabbitMQ", "error", err)
 	}
@@ -86,11 +85,11 @@ func main() {
 
 type graderGRPCServer struct {
 	logger *zap.SugaredLogger
-	q      messaging.Queue
+	q      queue.Queue
 	pb.UnimplementedGraderServiceServer
 }
 
-func newGraderGRPCServer(logger *zap.SugaredLogger, q messaging.Queue) *graderGRPCServer {
+func newGraderGRPCServer(logger *zap.SugaredLogger, q queue.Queue) *graderGRPCServer {
 	return &graderGRPCServer{
 		logger: logger,
 		q:      q,
@@ -113,7 +112,7 @@ func (s *graderGRPCServer) Broadcast(ctx context.Context, req *pb.BroadcastReque
 		return nil, status.Error(codes.Internal, "failed to marshal broadcast message")
 	}
 
-	err = s.q.Publish(ctx, "", "broadcast", &messaging.Derivery{
+	err = s.q.Publish(ctx, "", "broadcast", &queue.Derivery{
 		Body: body,
 	})
 	if err != nil {
@@ -177,7 +176,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, "failed to create result queue")
 	}
 
-	err = s.q.Publish(ctx, "", "run", &messaging.Derivery{
+	err = s.q.Publish(ctx, "", "run", &queue.Derivery{
 		Body:    message,
 		ReplyTo: qName,
 	})
@@ -196,7 +195,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	err = s.q.Consume(ctx, qName, 1, func(derivery *messaging.Derivery, exit chan struct{}) error {
+	err = s.q.Consume(ctx, qName, 1, func(derivery *queue.Derivery, exit chan struct{}) error {
 		result := &models.RunResult{}
 		err := json.Unmarshal(derivery.Body, result)
 		if err != nil {
@@ -258,7 +257,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 		return nil, status.Error(codes.Internal, "failed to create result queue")
 	}
 
-	err = s.q.Publish(ctx, "", "grade", &messaging.Derivery{
+	err = s.q.Publish(ctx, "", "grade", &queue.Derivery{
 		CorrelationID: id.String(),
 		ReplyTo:       qName,
 		Body:          message,
@@ -270,7 +269,7 @@ func (s *graderGRPCServer) Grade(ctx context.Context, req *pb.GradeRequest) (*pb
 	s.logger.Info("Publish message to the queue successfully!")
 
 	result := &models.GradeResult{}
-	err = s.q.Consume(ctx, qName, 1, func(derivery *messaging.Derivery, exit chan struct{}) error {
+	err = s.q.Consume(ctx, qName, 1, func(derivery *queue.Derivery, exit chan struct{}) error {
 		err := json.Unmarshal(derivery.Body, result)
 		if err != nil {
 			s.logger.Errorln("Cannot unmarshal grade result message", "error", err)
@@ -355,7 +354,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				return status.Error(codes.Internal, "failed to create result queue")
 			}
 
-			err = s.q.Publish(ctx, "", "run", &messaging.Derivery{
+			err = s.q.Publish(ctx, "", "run", &queue.Derivery{
 				CorrelationID: id.String(),
 				ReplyTo:       qName,
 				Body:          message,
@@ -366,7 +365,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 			}
 			s.logger.Info("Publish message to the queue successfully!")
 
-			return s.q.Consume(ctx, qName, 1, func(derivery *messaging.Derivery, exit chan struct{}) error {
+			return s.q.Consume(ctx, qName, 1, func(derivery *queue.Derivery, exit chan struct{}) error {
 				result := &models.RunResult{}
 				err := json.Unmarshal(derivery.Body, result)
 				if err != nil {

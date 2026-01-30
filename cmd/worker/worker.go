@@ -13,14 +13,13 @@ import (
 	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/constants/broadcast"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
-	"github.com/CSKU-Lab/go-grader/domain/messaging"
 	"github.com/CSKU-Lab/go-grader/domain/models"
 	"github.com/CSKU-Lab/go-grader/domain/services"
 	configPB "github.com/CSKU-Lab/go-grader/genproto/config/v1"
 	taskPB "github.com/CSKU-Lab/go-grader/genproto/task/v1"
-	"github.com/CSKU-Lab/go-grader/internal/infrastructure/queue"
 	"github.com/CSKU-Lab/go-grader/internal/logging"
 	"github.com/CSKU-Lab/go-grader/internal/setup"
+	"github.com/CSKU-Lab/queue"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -76,7 +75,7 @@ func main() {
 	runners := runnerPbToModel(runnerRes.Runners)
 	compares := comparePbToModel(compareRes.Compares)
 
-	q, err := queue.NewRabbitMQ(logger, env.GetQueueServerURL())
+	q, err := queue.NewRabbitMQ(env.GetQueueServerURL())
 	if err != nil {
 		logger.Fatalw("Cannot initialize RabbitMQ", "error", err)
 	}
@@ -100,7 +99,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "broadcast", 1, func(d *messaging.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "broadcast", 1, func(d *queue.Derivery, exit chan struct{}) error {
 			var action broadcast.Action
 
 			if err := json.Unmarshal(d.Body, &action); err != nil {
@@ -156,7 +155,7 @@ func main() {
 	})
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(derivery *messaging.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(derivery *queue.Derivery, exit chan struct{}) error {
 			payload := &models.RunExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
@@ -185,7 +184,7 @@ func main() {
 					logger.Errorw("Cannot marshal run result", "error", err)
 				}
 
-				err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 					Body:          bytesResult,
 					CorrelationID: payload.ID,
 				})
@@ -203,7 +202,7 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 				Body:          bytesResult,
 				CorrelationID: payload.ID,
 			})
@@ -224,7 +223,7 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 				CorrelationID: payload.ID,
 				Body:          bytesResult,
 			})
@@ -241,7 +240,7 @@ func main() {
 	})
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "grade", constants.MAX_QUEUES, func(derivery *messaging.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "grade", constants.MAX_QUEUES, func(derivery *queue.Derivery, exit chan struct{}) error {
 			payload := &models.GradeExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
@@ -289,7 +288,7 @@ func main() {
 					logger.Errorw("Cannot marshal run result", "error", err)
 				}
 
-				err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 					Body:          bytesResult,
 					CorrelationID: payload.ID,
 				})
@@ -307,7 +306,7 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 				Body:          bytesResult,
 				CorrelationID: payload.ID,
 			})
@@ -326,7 +325,7 @@ func main() {
 				logger.Errorw("Cannot marshal run result", "error", err)
 			}
 
-			err = q.Publish(ctx, "", derivery.ReplyTo, &messaging.Derivery{
+			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 				CorrelationID: payload.ID,
 				Body:          bytesResult,
 			})
