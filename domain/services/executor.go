@@ -291,6 +291,7 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 				}
 			}
 
+			testCaseResult.Input = tc.Input
 			testCaseResult.Output = output
 
 			metadata, err := instance.GetMetadata()

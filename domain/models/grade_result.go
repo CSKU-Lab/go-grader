@@ -5,6 +5,7 @@ import "github.com/CSKU-Lab/go-grader/domain/constants/execution"
 type TestCaseResult struct {
 	ID       string
 	Status   execution.Status
+	Input    string
 	Output   string
 	Message  string
 	WallTime float32
