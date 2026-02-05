@@ -99,7 +99,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "broadcast", 1, func(d *queue.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "broadcast", 1, true, func(d *queue.Derivery, exit chan struct{}) error {
 			var action broadcast.Action
 
 			if err := json.Unmarshal(d.Body, &action); err != nil {
@@ -155,7 +155,7 @@ func main() {
 	})
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "run", constants.MAX_QUEUES, func(derivery *queue.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "run", constants.MAX_QUEUES, true, func(derivery *queue.Derivery, exit chan struct{}) error {
 			payload := &models.RunExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
@@ -240,7 +240,7 @@ func main() {
 	})
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "grade", constants.MAX_QUEUES, func(derivery *queue.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "grade", constants.MAX_QUEUES, true, func(derivery *queue.Derivery, exit chan struct{}) error {
 			payload := &models.GradeExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
