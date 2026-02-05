@@ -2,17 +2,20 @@ package configs
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 )
 
 type env struct {
-	configServerURL string
-	taskServerURL   string
-	rbmqServerURL   string
-	port            string
-	logger          *zap.SugaredLogger
+	configServerURL  string
+	taskServerURL    string
+	rbmqServerURL    string
+	port             string
+	runQueueAmount   string
+	gradeQueueAmount string
+	logger           *zap.SugaredLogger
 }
 
 func NewEnv(logger *zap.SugaredLogger) *env {
@@ -30,11 +33,13 @@ func NewEnv(logger *zap.SugaredLogger) *env {
 	}
 
 	return &env{
-		configServerURL: os.Getenv("CONFIG_SERVER_URL"),
-		taskServerURL:   os.Getenv("TASK_SERVER_URL"),
-		rbmqServerURL:   os.Getenv("RBMQ_SERVER_URL"),
-		port:            os.Getenv("PORT"),
-		logger:          logger,
+		configServerURL:  os.Getenv("CONFIG_SERVER_URL"),
+		taskServerURL:    os.Getenv("TASK_SERVER_URL"),
+		rbmqServerURL:    os.Getenv("RBMQ_SERVER_URL"),
+		port:             os.Getenv("PORT"),
+		runQueueAmount:   os.Getenv("RUN_QUEUE_AMOUNT"),
+		gradeQueueAmount: os.Getenv("GRADE_QUEUE_AMOUNT"),
+		logger:           logger,
 	}
 }
 
@@ -64,4 +69,30 @@ func (m *env) GetPort() string {
 		m.logger.Fatal("You forget to set the PORT environment variable!")
 	}
 	return m.port
+}
+
+func (m *env) GetRunQueueAmount() int {
+	amount, err := strconv.Atoi(m.runQueueAmount)
+	if err != nil {
+		m.logger.Fatal("RUN_QUEUE_AMOUNT is not a valid integer")
+	}
+
+	if amount < 0 {
+		m.logger.Fatal("RUN_QUEUE_AMOUNT need to be greater than 0")
+	}
+
+	return amount
+}
+
+func (m *env) GetGradeQueueAmount() int {
+	amount, err := strconv.Atoi(m.gradeQueueAmount)
+	if err != nil {
+		m.logger.Fatal("GRADE_QUEUE_AMOUNT is not a valid integer")
+	}
+
+	if amount < 0 {
+		m.logger.Fatal("GRADE_QUEUE_AMOUNT need to be greater than 0")
+	}
+
+	return amount
 }

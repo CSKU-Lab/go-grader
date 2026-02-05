@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/CSKU-Lab/go-grader/configs"
-	"github.com/CSKU-Lab/go-grader/domain/constants"
 	"github.com/CSKU-Lab/go-grader/domain/constants/broadcast"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
@@ -155,7 +154,7 @@ func main() {
 	})
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "run", constants.MAX_QUEUES, true, func(derivery *queue.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "run", env.GetRunQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
 			payload := &models.RunExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
@@ -240,7 +239,7 @@ func main() {
 	})
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "grade", constants.MAX_QUEUES, true, func(derivery *queue.Derivery, exit chan struct{}) error {
+		err := q.Consume(ctx, "grade", env.GetGradeQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
 			payload := &models.GradeExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
