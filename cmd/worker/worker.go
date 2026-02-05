@@ -79,9 +79,22 @@ func main() {
 		logger.Fatalw("Cannot initialize RabbitMQ", "error", err)
 	}
 
+	_, err = q.CreateQueue(ctx, "run", &queue.QueueOptions{
+		Durable: true,
+	})
+	if err != nil {
+		logger.Fatalw("Cannot create 'run' queue", "error", err)
+	}
+	_, err = q.CreateQueue(ctx, "grade", &queue.QueueOptions{
+		Durable: true,
+	})
+	if err != nil {
+		logger.Fatalw("Cannot create 'run' queue", "error", err)
+	}
+
 	setup.Init(logger, runners, compares)
 
-	isolateService := services.NewIsolateService(ctx, logger)
+	isolateService := services.NewIsolateService(ctx, logger, env.GetRunQueueAmount(), env.GetGradeQueueAmount())
 	runnerService := services.NewRunnerService(logger)
 	compareService := services.NewCompareService(logger)
 	executorService := services.NewExecutorService(
