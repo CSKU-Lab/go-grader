@@ -20,9 +20,15 @@ type IsolateService struct {
 	logger *zap.SugaredLogger
 }
 
-func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger) *IsolateService {
-	boxIds := make(chan int, constants.MAX_QUEUES)
-	for i := range constants.MAX_QUEUES {
+func getBoxPoolAmount(rq int, gq int) int {
+	gradeMaxUsage := gq * 2 // need to be double for compare
+	return gradeMaxUsage + rq
+}
+
+func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger, runQueueAmount int, gradeQueueAmount int) *IsolateService {
+	pool := getBoxPoolAmount(runQueueAmount, gradeQueueAmount)
+	boxIds := make(chan int, pool)
+	for i := range pool {
 		boxIds <- i
 	}
 

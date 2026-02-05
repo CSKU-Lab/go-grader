@@ -132,7 +132,7 @@ func setupRunners(logger *zap.SugaredLogger, wg *sync.WaitGroup, runners []model
 func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []models.CompareConfig) {
 	defer wg.Done()
 
-	isolateService := services.NewIsolateService(context.Background(), logger)
+	isolateService := services.NewIsolateService(context.Background(), logger, len(compares), 0)
 	for _, compare := range compares {
 		wg.Go(func() {
 			runner := isolateService.NewInstance()
