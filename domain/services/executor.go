@@ -140,6 +140,12 @@ func (r *executorBuilder) Build() (*executor, execution.Status) {
 
 func (r *executor) Run() (*models.RunResult, error) {
 	instance := r.isolateService.NewInstance()
+	defer func() {
+		err := instance.Cleanup()
+		if err != nil {
+			r.logger.Fatalw("Cleanup error", "error", err.Error())
+		}
+	}()
 
 	for _, file := range r.files {
 		err := instance.CreateFile(file.Name, file.Content, 0644)
@@ -176,18 +182,13 @@ func (r *executor) Run() (*models.RunResult, error) {
 		return nil, err
 	}
 
-	err = instance.Cleanup()
-	if err != nil {
-		return nil, err
-	}
-
 	runResult := &models.RunResult{
 		WallTime: metadata.WallTime,
 		Memory:   metadata.Memory,
 		Output:   output,
+		Status:   execution.RUN_PASSED,
 	}
 
-	runResult.Status = execution.RUN_PASSED
 	return runResult, nil
 }
 
