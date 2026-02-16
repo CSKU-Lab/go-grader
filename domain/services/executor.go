@@ -162,7 +162,7 @@ func (r *executor) Run() (*models.RunResult, error) {
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			r.logger.Errorw("Run error", "error", err.Error(), "output", output)
+			r.logger.Infow("Run error", "error", err.Error(), "output", output)
 			return &models.RunResult{
 				Status: execution.RUN_FAILED,
 				Output: output,
@@ -304,7 +304,7 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 
 			err = instance.Cleanup()
 			if err != nil {
-				r.logger.Errorw("Cleanup error", "error", err.Error())
+				r.logger.Infow("Cleanup error", "error", err.Error())
 			}
 
 			resultMetadata.totalWallTime += metadata.WallTime
@@ -364,7 +364,7 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 
 			err = instance.Cleanup()
 			if err != nil {
-				r.logger.Errorw("Cleanup error", "error", err.Error())
+				r.logger.Infow("Cleanup error", "error", err.Error())
 			}
 
 			if compareResult == "" {
