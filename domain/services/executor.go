@@ -141,8 +141,7 @@ func (r *executorBuilder) Build() (*executor, execution.Status) {
 func (r *executor) Run() (*models.RunResult, error) {
 	instance := r.isolateService.NewInstance()
 	defer func() {
-		err := instance.Cleanup()
-		if err != nil {
+		if err := instance.Cleanup(); err != nil {
 			r.logger.Fatalw("Cleanup error", "error", err.Error())
 		}
 	}()
@@ -201,16 +200,17 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 
 	if r.runner.NeedCompile {
 		instance := r.isolateService.NewInstance()
+		defer func() {
+			if err := instance.Cleanup(); err != nil {
+				r.logger.Fatalw("Cleanup error", "error", err.Error())
+			}
+		}()
+
 		_, err := instance.CompileUsing(r.runner.Path)
 		if err != nil {
 			return &models.GradeResult{
 				Status: execution.COMPILE_FAILED,
 			}, nil
-		}
-
-		err = instance.Cleanup()
-		if err != nil {
-			return nil, err
 		}
 	}
 
@@ -269,6 +269,12 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 	for _, tc := range tcs {
 		eg.Go(func() error {
 			instance := r.isolateService.NewInstance()
+			defer func() {
+				if err := instance.Cleanup(); err != nil {
+					r.logger.Fatalw("Cleanup error", "error", err.Error())
+				}
+			}()
+
 			testCaseResult := models.TestCaseResult{
 				ID:     tc.ID,
 				Status: execution.RUN_FAILED,
@@ -303,11 +309,6 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 			testCaseResult.WallTime = metadata.WallTime
 			testCaseResult.Memory = metadata.Memory
 
-			err = instance.Cleanup()
-			if err != nil {
-				r.logger.Infow("Cleanup error", "error", err.Error())
-			}
-
 			resultMetadata.totalWallTime += metadata.WallTime
 			resultMetadata.totalMemory += metadata.Memory
 
@@ -337,6 +338,11 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 			}
 
 			instance = r.isolateService.NewInstance()
+			defer func() {
+				if err := instance.Cleanup(); err != nil {
+					r.logger.Fatalw("Cleanup error", "error", err.Error())
+				}
+			}()
 
 			err = instance.CreateFile("output", output, 0644)
 			if err != nil {
@@ -361,11 +367,6 @@ func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.Test
 			compareResult, err := instance.GetCompareResult()
 			if err != nil {
 				return err
-			}
-
-			err = instance.Cleanup()
-			if err != nil {
-				r.logger.Infow("Cleanup error", "error", err.Error())
 			}
 
 			if compareResult == "" {
