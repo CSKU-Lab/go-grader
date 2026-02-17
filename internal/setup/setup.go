@@ -132,10 +132,12 @@ func setupRunners(logger *zap.SugaredLogger, wg *sync.WaitGroup, runners []model
 func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []models.CompareConfig) {
 	defer wg.Done()
 
-	isolateService := services.NewIsolateService(context.Background(), logger, len(compares), 0)
+	isolateService := services.NewIsolateService(logger, len(compares), 0)
 	for _, compare := range compares {
 		wg.Go(func() {
+			ctx := context.Background()
 			runner := isolateService.NewRunInstance()
+			runner.Init(ctx)
 
 			comparePath := path.Join(constants.COMPARE_DIR, compare.ID)
 
@@ -157,7 +159,7 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 			scriptPath := path.Join(comparePath, compare.RunName)
 
 			if compare.BuildScript != "" {
-				exePath, err := buildCompareScript(runner, &compare)
+				exePath, err := buildCompareScript(ctx, runner, &compare)
 				if err != nil {
 					logger.Fatalf("Cannot build compare script for %s : %s", compare.ID, err)
 				}
@@ -216,7 +218,7 @@ func writeToComparesJson(compares []models.CompareConfig) error {
 	return nil
 }
 
-func buildCompareScript(runner *services.IsolateInstance, compare *models.CompareConfig) (string, error) {
+func buildCompareScript(ctx context.Context, runner *services.IsolateInstance, compare *models.CompareConfig) (string, error) {
 	for _, file := range compare.Files {
 		err := runner.CreateFile(file.Name, file.Content, 0644)
 		if err != nil {
@@ -229,7 +231,7 @@ func buildCompareScript(runner *services.IsolateInstance, compare *models.Compar
 		return "", err
 	}
 
-	_, err = runner.Compile()
+	_, err = runner.Compile(ctx)
 	if err != nil {
 		return "", err
 	}

@@ -94,7 +94,7 @@ func main() {
 
 	setup.Init(logger, runners, compares)
 
-	isolateService := services.NewIsolateService(ctx, logger, env.GetRunQueueAmount(), env.GetGradeQueueAmount())
+	isolateService := services.NewIsolateService(logger, env.GetRunQueueAmount(), env.GetGradeQueueAmount())
 	runnerService := services.NewRunnerService(logger)
 	compareService := services.NewCompareService(logger)
 	executorService := services.NewExecutorService(
@@ -222,7 +222,7 @@ func main() {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
 
-			result, err := executor.Run()
+			result, err := executor.Run(ctx)
 			if err != nil {
 				logger.Errorw("Error from runner", "error", err)
 				return err
@@ -326,7 +326,7 @@ func main() {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
 
-			result, err := executor.Grade()
+			result, err := executor.Grade(ctx)
 			if err != nil {
 				logger.Errorw("Error from runner", "error", err)
 				return err

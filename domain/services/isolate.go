@@ -15,13 +15,12 @@ import (
 )
 
 type IsolateService struct {
-	ctx         context.Context
 	runBoxIds   chan int
 	gradeBoxIds chan int
 	logger      *zap.SugaredLogger
 }
 
-func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger, runQueueAmount int, gradeQueueAmount int) *IsolateService {
+func NewIsolateService(logger *zap.SugaredLogger, runQueueAmount int, gradeQueueAmount int) *IsolateService {
 	// Run pool: IDs 0 to runQueueAmount-1
 	runBoxIds := make(chan int, runQueueAmount)
 	for i := range runQueueAmount {
@@ -36,7 +35,6 @@ func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger, runQueueA
 	}
 
 	return &IsolateService{
-		ctx:         ctx,
 		runBoxIds:   runBoxIds,
 		gradeBoxIds: gradeBoxIds,
 		logger:      logger,
@@ -44,7 +42,6 @@ func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger, runQueueA
 }
 
 type IsolateInstance struct {
-	ctx          context.Context
 	boxID        int
 	boxPath      string
 	metadataPath string
@@ -57,7 +54,6 @@ func (s *IsolateService) NewRunInstance() *IsolateInstance {
 	boxID := <-s.runBoxIds
 
 	instance := IsolateInstance{
-		ctx:          s.ctx,
 		boxID:        boxID,
 		boxPath:      fmt.Sprintf(constants.SANDBOX_PATH+"/box", boxID),
 		metadataPath: fmt.Sprintf(constants.SANDBOX_PATH+"/metadata", boxID),
@@ -66,8 +62,6 @@ func (s *IsolateService) NewRunInstance() *IsolateInstance {
 		logger:       s.logger,
 	}
 
-	instance.init()
-
 	return &instance
 }
 
@@ -75,7 +69,6 @@ func (s *IsolateService) NewGradeInstance() *IsolateInstance {
 	boxID := <-s.gradeBoxIds
 
 	instance := IsolateInstance{
-		ctx:          s.ctx,
 		boxID:        boxID,
 		boxPath:      fmt.Sprintf(constants.SANDBOX_PATH+"/box", boxID),
 		metadataPath: fmt.Sprintf(constants.SANDBOX_PATH+"/metadata", boxID),
@@ -83,8 +76,6 @@ func (s *IsolateService) NewGradeInstance() *IsolateInstance {
 		boxIds:       s.gradeBoxIds,
 		logger:       s.logger,
 	}
-
-	instance.init()
 
 	return &instance
 }
@@ -97,9 +88,9 @@ func (i *IsolateInstance) logFatalf(format string, args ...any) {
 	i.logger.Fatalf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
-func (s *IsolateInstance) execute(args ...string) (string, error) {
-	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
-	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
+func (i *IsolateInstance) execute(ctx context.Context, args ...string) (string, error) {
+	boxID := fmt.Sprintf("--box-id=%d", i.boxID)
+	cmd := exec.CommandContext(ctx, "isolate", append([]string{boxID}, args...)...)
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -109,9 +100,9 @@ func (s *IsolateInstance) execute(args ...string) (string, error) {
 	return string(output), nil
 }
 
-func (s *IsolateInstance) executeWithInput(input string, args ...string) (string, error) {
-	boxID := fmt.Sprintf("--box-id=%d", s.boxID)
-	cmd := exec.CommandContext(s.ctx, "isolate", append([]string{boxID}, args...)...)
+func (i *IsolateInstance) executeWithInput(ctx context.Context, input string, args ...string) (string, error) {
+	boxID := fmt.Sprintf("--box-id=%d", i.boxID)
+	cmd := exec.CommandContext(ctx, "isolate", append([]string{boxID}, args...)...)
 
 	cmd.Stdin = strings.NewReader(input)
 
@@ -123,9 +114,9 @@ func (s *IsolateInstance) executeWithInput(input string, args ...string) (string
 	return string(output), nil
 }
 
-func (i *IsolateInstance) init() {
+func (i *IsolateInstance) Init(ctx context.Context) {
 	i.log("Initializing sandbox...")
-	_, err := i.execute("--init")
+	_, err := i.execute(ctx, "--init")
 	if err != nil {
 		i.logFatalf("Error on init: %s", err)
 	}
@@ -139,16 +130,15 @@ func (i *IsolateInstance) BoxPath() string {
 	return i.boxPath
 }
 
-func (i *IsolateInstance) Cleanup() error {
+func (i *IsolateInstance) Cleanup() {
 	i.log("Cleaning up sandbox...")
-	_, err := i.execute("--cleanup")
+	// Use background context to ensure cleanup always runs even if parent context is canceled
+	_, err := i.execute(context.Background(), "--cleanup")
 	if err != nil {
-		return err
+		i.logFatalf("Cleanup failed, process must crash: %s", err)
 	}
 
 	i.boxIds <- i.boxID
-
-	return nil
 }
 
 func (i *IsolateInstance) CreateFile(name string, content string, filePerm os.FileMode) error {
@@ -169,7 +159,7 @@ func (i *IsolateInstance) RemoveDir(name string) error {
 	return os.RemoveAll(dirPath)
 }
 
-func (i *IsolateInstance) Compile() (string, error) {
+func (i *IsolateInstance) Compile(ctx context.Context) (string, error) {
 	i.log("Compiling program...")
 
 	args := []string{
@@ -181,7 +171,7 @@ func (i *IsolateInstance) Compile() (string, error) {
 		"build_script.sh",
 	}
 
-	output, err := i.execute(args...)
+	output, err := i.execute(ctx, args...)
 	if err != nil {
 		i.log("Compile error : %s", err.Error())
 		return output, err
@@ -192,7 +182,7 @@ func (i *IsolateInstance) Compile() (string, error) {
 	return output, err
 }
 
-func (i *IsolateInstance) CompileUsing(scriptDir string) (string, error) {
+func (i *IsolateInstance) CompileUsing(ctx context.Context, scriptDir string) (string, error) {
 	i.log("Compiling program...")
 
 	args := []string{
@@ -205,7 +195,7 @@ func (i *IsolateInstance) CompileUsing(scriptDir string) (string, error) {
 		fmt.Sprintf("%s/build_script.sh", scriptDir),
 	}
 
-	output, err := i.execute(args...)
+	output, err := i.execute(ctx, args...)
 	if err != nil {
 		i.log("Compile error : %s", err.Error())
 		return output, err
@@ -216,7 +206,7 @@ func (i *IsolateInstance) CompileUsing(scriptDir string) (string, error) {
 	return output, nil
 }
 
-func (i *IsolateInstance) Run(scriptDir string, input string, limit *models.Limit) (string, error) {
+func (i *IsolateInstance) Run(ctx context.Context, scriptDir string, input string, limit *models.Limit) (string, error) {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
@@ -236,9 +226,9 @@ func (i *IsolateInstance) Run(scriptDir string, input string, limit *models.Limi
 	var err error
 
 	if input != "" {
-		output, err = i.executeWithInput(input, args...)
+		output, err = i.executeWithInput(ctx, input, args...)
 	} else {
-		output, err = i.execute(args...)
+		output, err = i.execute(ctx, args...)
 	}
 
 	if err != nil {

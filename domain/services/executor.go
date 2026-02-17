@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -139,12 +140,11 @@ func (r *executorBuilder) Build() (*executor, execution.Status) {
 	return exec, execution.BUILD_PASSED
 }
 
-func (r *executor) Run() (*models.RunResult, error) {
+func (r *executor) Run(ctx context.Context) (*models.RunResult, error) {
 	instance := r.isolateService.NewRunInstance()
+	instance.Init(ctx)
 	defer func() {
-		if err := instance.Cleanup(); err != nil {
-			r.logger.Fatalw("Cleanup error", "error", err.Error())
-		}
+		instance.Cleanup()
 	}()
 
 	for _, file := range r.files {
@@ -155,7 +155,7 @@ func (r *executor) Run() (*models.RunResult, error) {
 	}
 
 	if r.runner.NeedCompile {
-		output, err := instance.CompileUsing(r.runner.Path)
+		output, err := instance.CompileUsing(ctx, r.runner.Path)
 		if err != nil {
 			return &models.RunResult{
 				Status: execution.COMPILE_FAILED,
@@ -164,7 +164,7 @@ func (r *executor) Run() (*models.RunResult, error) {
 		}
 	}
 
-	output, err := instance.Run(r.runner.Path, r.input, r.limits)
+	output, err := instance.Run(ctx, r.runner.Path, r.input, r.limits)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -192,7 +192,7 @@ func (r *executor) Run() (*models.RunResult, error) {
 	return runResult, nil
 }
 
-func (r *executor) Grade() (*models.GradeResult, error) {
+func (r *executor) Grade(ctx context.Context) (*models.GradeResult, error) {
 	if r.compare == nil {
 		return &models.GradeResult{
 			Status: execution.GRADER_ERROR,
@@ -207,7 +207,7 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 
 	testCaseGroupResults := make([]models.TestCaseGroupResult, 0, len(r.testCaseGroups))
 	var mu sync.Mutex
-	var eg errgroup.Group
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(30)
 	for _, tcg := range r.testCaseGroups {
 		eg.Go(func() error {
@@ -223,7 +223,7 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 				isolateService: r.isolateService,
 			}
 
-			result, metadata, err := tcgRunner.Result()
+			result, metadata, err := tcgRunner.Result(ctx)
 			if err != nil {
 				return err
 			}
@@ -275,18 +275,18 @@ type testcaseGroupRunner struct {
 	isolateService *IsolateService
 }
 
-func (t *testcaseGroupRunner) Result() (*models.TestCaseGroupResult, *runMetadata, error) {
+func (t *testcaseGroupRunner) Result(ctx context.Context) (*models.TestCaseGroupResult, *runMetadata, error) {
 	var testcaseResults []models.TestCaseResult
 	isSomeTestCaseFailed := false
 	var totalWallTime float32
 	var totalMemory int32
 
 	var mu sync.Mutex
-	var eg errgroup.Group
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(30)
 	for _, tc := range t.tcs {
 		eg.Go(func() error {
-			result, err := t.GetTestCaseResult(&tc)
+			result, err := t.GetTestCaseResult(ctx, &tc)
 			if err != nil {
 				return err
 			}
@@ -326,8 +326,8 @@ func (t *testcaseGroupRunner) Result() (*models.TestCaseGroupResult, *runMetadat
 		}, nil
 }
 
-func (t *testcaseGroupRunner) GetTestCaseResult(tc *models.TestCase) (*models.TestCaseResult, error) {
-	output, metadata, err := t.RunTestCase(tc)
+func (t *testcaseGroupRunner) GetTestCaseResult(ctx context.Context, tc *models.TestCase) (*models.TestCaseResult, error) {
+	output, metadata, err := t.RunTestCase(ctx, tc)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (t *testcaseGroupRunner) GetTestCaseResult(tc *models.TestCase) (*models.Te
 	status := metadata.status
 	message := output
 	if status == execution.RUN_PASSED {
-		compareResult, err := t.CompareOutput(output, tc.Output)
+		compareResult, err := t.CompareOutput(ctx, output, tc.Output)
 		if err != nil {
 			return nil, err
 		}
@@ -365,12 +365,11 @@ type testcaseMetadata struct {
 	memory   int32
 }
 
-func (t *testcaseGroupRunner) RunTestCase(tc *models.TestCase) (output string, tcMet *testcaseMetadata, err error) {
+func (t *testcaseGroupRunner) RunTestCase(ctx context.Context, tc *models.TestCase) (output string, tcMet *testcaseMetadata, err error) {
 	instance := t.isolateService.NewGradeInstance()
+	instance.Init(ctx)
 	defer func() {
-		if _err := instance.Cleanup(); _err != nil {
-			err = errors.Join(err, fmt.Errorf("cleanup error: %w", _err))
-		}
+		instance.Cleanup()
 	}()
 
 	for _, file := range t.files {
@@ -383,7 +382,7 @@ func (t *testcaseGroupRunner) RunTestCase(tc *models.TestCase) (output string, t
 	}
 
 	if t.runner.NeedCompile {
-		output, err := instance.CompileUsing(t.runner.Path)
+		output, err := instance.CompileUsing(ctx, t.runner.Path)
 		if err != nil {
 			return output, &testcaseMetadata{
 				status: execution.COMPILE_FAILED,
@@ -391,7 +390,7 @@ func (t *testcaseGroupRunner) RunTestCase(tc *models.TestCase) (output string, t
 		}
 	}
 
-	output, err = instance.Run(t.runner.Path, tc.Input, t.limits)
+	output, err = instance.Run(ctx, t.runner.Path, tc.Input, t.limits)
 	if err != nil {
 		return output,
 			&testcaseMetadata{
@@ -433,12 +432,11 @@ func (t *testcaseGroupRunner) RunTestCase(tc *models.TestCase) (output string, t
 	}, nil
 }
 
-func (t *testcaseGroupRunner) CompareOutput(output, expected string) (compareResult string, err error) {
+func (t *testcaseGroupRunner) CompareOutput(ctx context.Context, output, expected string) (compareResult string, err error) {
 	instance := t.isolateService.NewGradeInstance()
+	instance.Init(ctx)
 	defer func() {
-		if _err := instance.Cleanup(); _err != nil {
-			err = errors.Join(err, fmt.Errorf("cleanup error: %w", _err))
-		}
+		instance.Cleanup()
 	}()
 
 	err = instance.CreateFile("output", output, 0644)
@@ -451,7 +449,7 @@ func (t *testcaseGroupRunner) CompareOutput(output, expected string) (compareRes
 		return "", err
 	}
 
-	output, err = instance.Run(t.compare.Path, "", nil)
+	output, err = instance.Run(ctx, t.compare.Path, "", nil)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {

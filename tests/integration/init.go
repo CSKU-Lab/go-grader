@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"context"
 	"testing"
 
 	"github.com/CSKU-Lab/go-grader/domain/services"
@@ -19,7 +18,7 @@ func initTest(t *testing.T) (services.ExecutorService, func()) {
 	}
 
 	setup.Init(logger, testdatas.Runners, testdatas.Compares)
-	isolateService := services.NewIsolateService(context.Background(), logger, 2, 2)
+	isolateService := services.NewIsolateService(logger, 2, 2)
 	runnerService := services.NewRunnerService(logger)
 	compareService := services.NewCompareService(logger)
 	executorService := services.NewExecutorService(logger, isolateService, runnerService, compareService)
