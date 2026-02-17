@@ -24,14 +24,14 @@ type IsolateService struct {
 func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger, runQueueAmount int, gradeQueueAmount int) *IsolateService {
 	// Run pool: IDs 0 to runQueueAmount-1
 	runBoxIds := make(chan int, runQueueAmount)
-	for i := 0; i < runQueueAmount; i++ {
+	for i := range runQueueAmount {
 		runBoxIds <- i
 	}
 
 	// Grade pool: IDs runQueueAmount to runQueueAmount + (gradeQueueAmount*2) - 1
 	gradePoolSize := gradeQueueAmount * 2
 	gradeBoxIds := make(chan int, gradePoolSize)
-	for i := 0; i < gradePoolSize; i++ {
+	for i := range gradePoolSize {
 		gradeBoxIds <- runQueueAmount + i
 	}
 
