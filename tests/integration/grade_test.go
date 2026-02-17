@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -10,20 +12,15 @@ import (
 )
 
 func TestGradeCompileError(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	err := runner.SetRunner("cpp_test")
-	if err != nil {
-		t.Fatalf("Cannot set language: %s", err)
-	}
-
-	err = runner.SetFiles([]models.File{
-		{
-			Name: "main.cpp",
-			Content: `#include <iostream>
+	executor, status := executorService.NewExecutor().
+		RunnerID("cpp_test").
+		Files([]models.File{
+			{
+				Name: "main.cpp",
+				Content: `#include <iostream>
 				using namespace std;
 				int main() {
 					string name;
@@ -31,43 +28,62 @@ func TestGradeCompileError(t *testing.T) {
 					cout << "Hello " << name << endl
 					return 0;
 				}`,
-		},
-	})
-	if err != nil {
-		t.Fatalf("Cannot set files: %s", err)
+			},
+		}).
+		CompareID("claude_3.7").
+		TestCaseGroups([]models.TestCaseGroup{
+			{
+				ID:        "group_1",
+				TestCases: testdatas.Tasks[0].TestCases,
+				Score:     100,
+			},
+		}).
+		Build()
+
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
 	}
 
-	runner.SetCompareID("claude_3.7")
-	runner.SetTestCases(testdatas.Tasks[0].TestCases)
-
-	result, err := runner.Grade()
+	result, err := executor.Grade(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expected := execution.COMPILE_FAILED
-	got := result.Status
+	// Grade() returns only RUN_PASSED or RUN_FAILED at top level
+	// Check individual test cases for specific failure reasons
+	if result.Status != execution.RUN_FAILED {
+		t.Fatalf("Expected top-level status: RUN_FAILED, Got: %s", result.Status)
+	}
 
-	if got != expected {
-		t.Fatalf("Expected: %s, Got: %s", expected, got)
+	// Verify that individual test cases have COMPILE_FAILED
+	foundCompileError := false
+	for _, tcGroup := range result.TestCaseGroupResults {
+		for _, testcase := range tcGroup.Results {
+			if testcase.Status == execution.COMPILE_FAILED {
+				foundCompileError = true
+				break
+			}
+		}
+		if foundCompileError {
+			break
+		}
+	}
+
+	if !foundCompileError {
+		t.Fatalf("Expected to find COMPILE_FAILED in individual test cases")
 	}
 }
 
 func TestGradePassed(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	err := runner.SetRunner("cpp_test")
-	if err != nil {
-		t.Fatalf("Cannot set language: %s", err)
-	}
-
-	err = runner.SetFiles([]models.File{
-		{
-			Name: "main.cpp",
-			Content: `#include <iostream>
+	executor, status := executorService.NewExecutor().
+		RunnerID("cpp_test").
+		Files([]models.File{
+			{
+				Name: "main.cpp",
+				Content: `#include <iostream>
 				using namespace std;
 				int main() {
 					string name;
@@ -75,16 +91,23 @@ func TestGradePassed(t *testing.T) {
 					cout << "Hello " << name << endl;
 					return 0;
 				}`,
-		},
-	})
-	if err != nil {
-		t.Fatalf("Cannot set files: %s", err)
+			},
+		}).
+		CompareID("claude_3.7").
+		TestCaseGroups([]models.TestCaseGroup{
+			{
+				ID:        "group_1",
+				TestCases: testdatas.Tasks[0].TestCases,
+				Score:     100,
+			},
+		}).
+		Build()
+
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
 	}
 
-	runner.SetCompareID("claude_3.7")
-	runner.SetTestCases(testdatas.Tasks[0].TestCases)
-
-	result, err := runner.Grade()
+	result, err := executor.Grade(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,20 +121,15 @@ func TestGradePassed(t *testing.T) {
 }
 
 func TestGradeFailed(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	err := runner.SetRunner("cpp_test")
-	if err != nil {
-		t.Fatalf("Cannot set language: %s", err)
-	}
-
-	err = runner.SetFiles([]models.File{
-		{
-			Name: "main.cpp",
-			Content: `#include <iostream>
+	executor, status := executorService.NewExecutor().
+		RunnerID("cpp_test").
+		Files([]models.File{
+			{
+				Name: "main.cpp",
+				Content: `#include <iostream>
 				using namespace std;
 				int main() {
 					string name;
@@ -119,16 +137,23 @@ func TestGradeFailed(t *testing.T) {
 					cout << "Hello " << "eiei" << endl;
 					return 0;
 				}`,
-		},
-	})
-	if err != nil {
-		t.Fatalf("Cannot set files: %s", err)
+			},
+		}).
+		CompareID("claude_3.7").
+		TestCaseGroups([]models.TestCaseGroup{
+			{
+				ID:        "group_1",
+				TestCases: testdatas.Tasks[0].TestCases,
+				Score:     100,
+			},
+		}).
+		Build()
+
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
 	}
 
-	runner.SetCompareID("claude_3.7")
-	runner.SetTestCases(testdatas.Tasks[0].TestCases)
-
-	result, err := runner.Grade()
+	result, err := executor.Grade(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +171,7 @@ func TestGradeFailed(t *testing.T) {
 }
 
 func TestGradeMultipleRunners(t *testing.T) {
-	runnerService, cleanup := initTest(t)
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
 	var wg sync.WaitGroup
@@ -156,13 +181,12 @@ func TestGradeMultipleRunners(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runner := runnerService.NewExecutor()
-			defer runner.Cleanup()
-			runner.SetRunner("cpp_test")
-			runner.SetFiles([]models.File{
-				{
-					Name: "main.cpp",
-					Content: `#include <iostream>
+			executor, status := executorService.NewExecutor().
+				RunnerID("cpp_test").
+				Files([]models.File{
+					{
+						Name: "main.cpp",
+						Content: `#include <iostream>
 				using namespace std;
 				int main() {
 					string name;
@@ -170,11 +194,24 @@ func TestGradeMultipleRunners(t *testing.T) {
 					cout << "Hello " << name << endl;
 					return 0;
 				}`,
-				},
-			})
-			runner.SetCompareID("claude_3.7")
-			runner.SetTestCases(testdatas.Tasks[0].TestCases)
-			_, err := runner.Grade()
+					},
+				}).
+				CompareID("claude_3.7").
+				TestCaseGroups([]models.TestCaseGroup{
+					{
+						ID:        "group_1",
+						TestCases: testdatas.Tasks[0].TestCases,
+						Score:     100,
+					},
+				}).
+				Build()
+
+			if status != execution.BUILD_PASSED {
+				errChan <- errors.New("build failed: " + string(status))
+				return
+			}
+
+			_, err := executor.Grade(context.Background())
 			if err != nil {
 				errChan <- err
 			}
@@ -193,46 +230,56 @@ func TestGradeMultipleRunners(t *testing.T) {
 }
 
 func TestGradeWithLimits(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	err := runner.SetRunner("python_test")
-	if err != nil {
-		t.Fatalf("Cannot set language: %s", err)
-	}
-
-	err = runner.SetFiles([]models.File{
-		{
-			Name: "main.py",
-			Content: `import time
+	executor, status := executorService.NewExecutor().
+		RunnerID("python_test").
+		Files([]models.File{
+			{
+				Name: "main.py",
+				Content: `import time
 time.sleep(50)`,
-		},
-	})
-	if err != nil {
-		t.Fatalf("Cannot set files: %s", err)
+			},
+		}).
+		CompareID("claude_3.7").
+		TestCaseGroups([]models.TestCaseGroup{
+			{
+				ID:        "group_1",
+				TestCases: testdatas.Tasks[0].TestCases,
+				Score:     100,
+			},
+		}).
+		Limits(&models.Limit{
+			CPUTime:      1,
+			WallTime:     6,
+			CPUExtraTime: 2,
+		}).
+		Build()
+
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
 	}
 
-	runner.SetCompareID("claude_3.7")
-	runner.SetTestCases(testdatas.Tasks[0].TestCases)
-	runner.SetLimits(&models.Limit{
-		CPUTime:      1,
-		WallTime:     6,
-		CPUExtraTime: 2,
-	})
-
-	result, err := runner.Grade()
+	result, err := executor.Grade(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, testcase := range result.TestCaseResults {
-		expected := execution.TIME_LIMIT_EXCEEDED
-		got := testcase.Status
+	// Grade() returns only RUN_PASSED or RUN_FAILED at top level
+	if result.Status != execution.RUN_FAILED {
+		t.Fatalf("Expected top-level status: RUN_FAILED, Got: %s", result.Status)
+	}
 
-		if got != expected {
-			t.Fatalf("Expected: %s, Got: %s", expected, got)
+	// Check individual test cases for TIME_LIMIT_EXCEEDED
+	for _, tcGroup := range result.TestCaseGroupResults {
+		for _, testcase := range tcGroup.Results {
+			expected := execution.TIME_LIMIT_EXCEEDED
+			got := testcase.Status
+
+			if got != expected {
+				t.Fatalf("Expected: %s, Got: %s", expected, got)
+			}
 		}
 	}
 }

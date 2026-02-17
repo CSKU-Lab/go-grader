@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"testing"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
@@ -8,19 +9,24 @@ import (
 )
 
 func TestRunPassed(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	runner.SetRunner("python_test")
-	runner.SetFiles([]models.File{
-		{
-			Name:    "main.py",
-			Content: `print("Hello World")`,
-		},
-	})
-	result, err := runner.Run()
+	executor, status := executorService.NewExecutor().
+		RunnerID("python_test").
+		Files([]models.File{
+			{
+				Name:    "main.py",
+				Content: `print("Hello World")`,
+			},
+		}).
+		Build()
+
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
+	}
+
+	result, err := executor.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Cannot run: %s", err)
 	}
@@ -29,27 +35,31 @@ func TestRunPassed(t *testing.T) {
 }
 
 func TestRunWithInput(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	runner.SetRunner("python_test")
-	runner.SetFiles([]models.File{
-		{
-			Name:    "main.py",
-			Content: `print(input())`,
-		},
-	})
+	executor, status := executorService.NewExecutor().
+		RunnerID("python_test").
+		Files([]models.File{
+			{
+				Name:    "main.py",
+				Content: `print(input())`,
+			},
+		}).
+		Input("Hello World").
+		Build()
 
-	runner.SetInput("Hello World")
-	result, err := runner.Run()
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
+	}
+
+	result, err := executor.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Cannot run: %s", err)
 	}
 
 	expected := "Hello World\n"
-	got := result.StdOut
+	got := result.Output
 
 	if got != expected {
 		t.Fatalf("Expected: %s, Got: %s", expected, got)
@@ -57,20 +67,24 @@ func TestRunWithInput(t *testing.T) {
 }
 
 func TestRunCompileFailed(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	runner.SetRunner("cpp_test")
-	runner.SetFiles([]models.File{
-		{
-			Name:    "main.cpp",
-			Content: "#include <iostream",
-		},
-	})
+	executor, status := executorService.NewExecutor().
+		RunnerID("cpp_test").
+		Files([]models.File{
+			{
+				Name:    "main.cpp",
+				Content: "#include <iostream",
+			},
+		}).
+		Build()
 
-	result, err := runner.Run()
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
+	}
+
+	result, err := executor.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Cannot run : %s", err)
 	}
@@ -84,19 +98,24 @@ func TestRunCompileFailed(t *testing.T) {
 }
 
 func TestRunFailed(t *testing.T) {
-	runnerService, cleanup := initTest(t)
-	runner := runnerService.NewExecutor()
-	defer runner.Cleanup()
+	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	runner.SetRunner("python_test")
-	runner.SetFiles([]models.File{
-		{
-			Name:    "main.py",
-			Content: `print("Hello World"`,
-		},
-	})
-	result, err := runner.Run()
+	executor, status := executorService.NewExecutor().
+		RunnerID("python_test").
+		Files([]models.File{
+			{
+				Name:    "main.py",
+				Content: `print("Hello World"`,
+			},
+		}).
+		Build()
+
+	if status != execution.BUILD_PASSED {
+		t.Fatalf("Build failed: %s", status)
+	}
+
+	result, err := executor.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Cannot run: %s", err)
 	}
