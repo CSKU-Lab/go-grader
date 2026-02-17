@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"runtime"
+	"sync"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
 	"github.com/CSKU-Lab/go-grader/domain/models"
@@ -61,18 +63,18 @@ type executorBuilder struct {
 	limits         *models.Limit
 	testcaseGroups []models.TestCaseGroup
 
-	isolateService *IsolateService
 	runnerService  *RunnerService
 	compareService *CompareService
 	logger         *zap.SugaredLogger
+	isolateService *IsolateService
 }
 
 func (r *executorService) NewExecutor() ExecutorBuilder {
 	return &executorBuilder{
 		runnerService:  r.runnerService,
-		isolateService: r.isolateService,
 		compareService: r.compareService,
 		logger:         r.logger,
+		isolateService: r.isolateService,
 	}
 }
 
@@ -198,194 +200,269 @@ func (r *executor) Grade() (*models.GradeResult, error) {
 		}, nil
 	}
 
-	if r.runner.NeedCompile {
-		instance := r.isolateService.NewInstance()
-		defer func() {
-			if err := instance.Cleanup(); err != nil {
-				r.logger.Fatalw("Cleanup error", "error", err.Error())
-			}
-		}()
+	var totalScore int32
+	var totalWallTime float32
+	var totalMemory int32
+	var totalTestCases int32
+	status := execution.RUN_PASSED
 
-		_, err := instance.CompileUsing(r.runner.Path)
-		if err != nil {
-			return &models.GradeResult{
-				Status: execution.COMPILE_FAILED,
-			}, nil
-		}
-	}
-
-	totalWallTime := float32(0)
-	totalMemory := int32(0)
-	gradedStatus := execution.RUN_PASSED
 	testCaseGroupResults := make([]models.TestCaseGroupResult, 0, len(r.testCaseGroups))
-	for _, group := range r.testCaseGroups {
-		groupResults, metadata, err := r.generateTestCaseResults(group.TestCases)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate test case results: %w", err)
-		}
-
-		score := int32(0)
-		if !metadata.isFailed {
-			score = group.Score
-		}
-
-		testCaseGroupResults = append(testCaseGroupResults, models.TestCaseGroupResult{
-			ID:      group.ID,
-			Results: groupResults,
-			Score:   score,
-		})
-
-		totalWallTime += metadata.totalWallTime
-		totalMemory += metadata.totalMemory
-
-		if metadata.isFailed {
-			gradedStatus = execution.RUN_FAILED
-		}
-	}
-
-	tcsCount := 1
-	for _, group := range r.testCaseGroups {
-		tcsCount += len(group.TestCases) - 1
-	}
-
-	return &models.GradeResult{
-		Status:               gradedStatus,
-		TestCaseGroupResults: testCaseGroupResults,
-		AvgWallTime:          totalWallTime / float32(tcsCount),
-		AvgMemory:            totalMemory / int32(tcsCount),
-	}, nil
-}
-
-type resultMetadata struct {
-	totalWallTime float32
-	totalMemory   int32
-	isFailed      bool
-}
-
-func (r *executor) generateTestCaseResults(tcs []models.TestCase) ([]models.TestCaseResult, *resultMetadata, error) {
-	resultMetadata := &resultMetadata{}
-	testCaseResults := make([]models.TestCaseResult, 0, len(tcs))
+	var mu sync.Mutex
 	var eg errgroup.Group
-	for _, tc := range tcs {
+	eg.SetLimit(30)
+	for _, tcg := range r.testCaseGroups {
 		eg.Go(func() error {
-			instance := r.isolateService.NewInstance()
-			defer func() {
-				if err := instance.Cleanup(); err != nil {
-					r.logger.Fatalw("Cleanup error", "error", err.Error())
-				}
-			}()
-
-			testCaseResult := models.TestCaseResult{
-				ID:     tc.ID,
-				Status: execution.RUN_FAILED,
+			tcgRunner := &testcaseGroupRunner{
+				logger:         r.logger,
+				id:             tcg.ID,
+				tcs:            tcg.TestCases,
+				score:          tcg.Score,
+				files:          r.files,
+				limits:         r.limits,
+				runner:         r.runner,
+				compare:        r.compare,
+				isolateService: r.isolateService,
 			}
 
-			for _, file := range r.files {
-				err := instance.CreateFile(file.Name, file.Content, 0644)
-				if err != nil {
-					return err
-				}
-			}
-
-			output, err := instance.Run(r.runner.Path, tc.Input, r.limits)
-			if err != nil {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					testCaseResult.Output = output
-					testCaseResult.Status = execution.RUN_FAILED
-				} else {
-					return err
-				}
-			}
-
-			testCaseResult.Input = tc.Input
-			testCaseResult.Output = output
-
-			metadata, err := instance.GetMetadata()
+			result, metadata, err := tcgRunner.Result()
 			if err != nil {
 				return err
 			}
 
-			testCaseResult.WallTime = metadata.WallTime
-			testCaseResult.Memory = metadata.Memory
+			mu.Lock()
+			defer mu.Unlock()
 
-			resultMetadata.totalWallTime += metadata.WallTime
-			resultMetadata.totalMemory += metadata.Memory
-
-			if metadata.FailedStatus != "" {
-				testCaseResult.Message = metadata.FailedMessage
-				switch metadata.FailedStatus {
-				case "TO":
-					testCaseResult.Status = execution.TIME_LIMIT_EXCEEDED
-				case "RE":
-					testCaseResult.Status = execution.RUNTIME_ERROR
-				case "SG":
-					testCaseResult.Status = execution.SIGNAL_ERROR
-				case "XX":
-					testCaseResult.Status = execution.GRADER_ERROR
-				}
-
-				if r.limits.Memory != 0 && metadata.Memory > r.limits.Memory {
-					testCaseResult.Status = execution.MEMORY_LIMIT_EXCEEDED
-				}
-
-				resultMetadata.isFailed = true
+			if metadata.SomeTestCaseFailed && status != execution.RUN_FAILED {
+				status = execution.RUN_FAILED
 			}
 
-			if resultMetadata.isFailed {
-				testCaseResults = append(testCaseResults, testCaseResult)
-				return nil
-			}
-
-			instance = r.isolateService.NewInstance()
-			defer func() {
-				if err := instance.Cleanup(); err != nil {
-					r.logger.Fatalw("Cleanup error", "error", err.Error())
-				}
-			}()
-
-			err = instance.CreateFile("output", output, 0644)
-			if err != nil {
-				return err
-			}
-
-			err = instance.CreateFile("sol_output", tc.Output, 0644)
-			if err != nil {
-				return err
-			}
-
-			output, err = instance.Run(r.compare.Path, "", nil)
-			if err != nil {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					if exitErr.ExitCode() != 1 {
-						return err
-					}
-				}
-			}
-
-			compareResult, err := instance.GetCompareResult()
-			if err != nil {
-				return err
-			}
-
-			if compareResult == "" {
-				testCaseResult.Status = execution.RUN_PASSED
-			} else {
-
-				testCaseResult.Message = compareResult
-				resultMetadata.isFailed = true
-			}
-
-			testCaseResults = append(testCaseResults, testCaseResult)
+			testCaseGroupResults = append(testCaseGroupResults, *result)
+			totalScore += result.Score
+			totalWallTime += metadata.WallTime
+			totalMemory += metadata.Memory
+			totalTestCases += int32(len(result.Results))
 			return nil
 		})
 	}
 
-	err := eg.Wait()
-	if err != nil {
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	return &models.GradeResult{
+		Status:               status,
+		TestCaseGroupResults: testCaseGroupResults,
+		AvgWallTime:          totalWallTime / float32(totalTestCases),
+		AvgMemory:            totalMemory / totalTestCases,
+		Score:                totalScore,
+	}, nil
+}
+
+type runMetadata struct {
+	WallTime           float32
+	Memory             int32
+	SomeTestCaseFailed bool
+}
+
+type testcaseGroupRunner struct {
+	logger         *zap.SugaredLogger
+	id             string
+	score          int32
+	tcs            []models.TestCase
+	files          []models.File
+	limits         *models.Limit
+	runner         *models.LocalRunner
+	compare        *models.LocalCompare
+	isolateService *IsolateService
+}
+
+func (t *testcaseGroupRunner) Result() (*models.TestCaseGroupResult, *runMetadata, error) {
+	var testcaseResults []models.TestCaseResult
+	isSomeTestCaseFailed := false
+	var totalWallTime float32
+	var totalMemory int32
+
+	var mu sync.Mutex
+	var eg errgroup.Group
+	eg.SetLimit(30)
+	for _, tc := range t.tcs {
+		eg.Go(func() error {
+			result, err := t.GetTestCaseResult(&tc)
+			if err != nil {
+				return err
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+
+			if !isSomeTestCaseFailed && result.Status != execution.RUN_PASSED {
+				isSomeTestCaseFailed = true
+			}
+
+			testcaseResults = append(testcaseResults, *result)
+
+			totalWallTime += result.WallTime
+			totalMemory += result.Memory
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
 		return nil, nil, err
 	}
 
-	return testCaseResults, resultMetadata, nil
+	t.logger.Infow("Go routine counts", "count", runtime.NumGoroutine())
+
+	score := t.score
+	if isSomeTestCaseFailed {
+		score = 0
+	}
+
+	return &models.TestCaseGroupResult{
+			ID:      t.id,
+			Score:   score,
+			Results: testcaseResults,
+		}, &runMetadata{
+			WallTime:           totalWallTime,
+			Memory:             totalMemory,
+			SomeTestCaseFailed: isSomeTestCaseFailed,
+		}, nil
+}
+
+func (t *testcaseGroupRunner) GetTestCaseResult(tc *models.TestCase) (*models.TestCaseResult, error) {
+	output, metadata, err := t.RunTestCase(tc)
+	if err != nil {
+		return nil, err
+	}
+
+	status := metadata.status
+	message := output
+	if status == execution.RUN_PASSED {
+		compareResult, err := t.CompareOutput(output, tc.Output)
+		if err != nil {
+			return nil, err
+		}
+		t.logger.Infow("Compare result", "test_case_id", tc.ID, "compare_result", compareResult)
+
+		if compareResult != "" {
+			status = execution.RUN_FAILED
+		}
+
+		message = compareResult
+	}
+
+	return &models.TestCaseResult{
+		ID:       tc.ID,
+		Status:   status,
+		Input:    tc.Input,
+		Output:   output,
+		Message:  message,
+		WallTime: metadata.walltime,
+		Memory:   metadata.memory,
+	}, nil
+}
+
+type testcaseMetadata struct {
+	status   execution.Status
+	walltime float32
+	memory   int32
+}
+
+func (t *testcaseGroupRunner) RunTestCase(tc *models.TestCase) (output string, tcMet *testcaseMetadata, err error) {
+	instance := t.isolateService.NewInstance()
+	defer func() {
+		if _err := instance.Cleanup(); _err != nil {
+			err = errors.Join(err, fmt.Errorf("cleanup error: %w", _err))
+		}
+	}()
+
+	for _, file := range t.files {
+		err := instance.CreateFile(file.Name, file.Content, 0644)
+		if err != nil {
+			return "create file error", &testcaseMetadata{
+				status: execution.GRADER_ERROR,
+			}, nil
+		}
+	}
+
+	if t.runner.NeedCompile {
+		output, err := instance.CompileUsing(t.runner.Path)
+		if err != nil {
+			return output, &testcaseMetadata{
+				status: execution.COMPILE_FAILED,
+			}, nil
+		}
+	}
+
+	output, err = instance.Run(t.runner.Path, tc.Input, t.limits)
+	if err != nil {
+		return output,
+			&testcaseMetadata{
+				status: execution.GRADER_ERROR,
+			},
+			nil
+	}
+
+	metadata, err := instance.GetMetadata()
+	if err != nil {
+		return "", &testcaseMetadata{
+			status: execution.GRADER_ERROR,
+		}, err
+	}
+
+	status := execution.RUN_PASSED
+	if metadata.FailedStatus != "" {
+		switch metadata.FailedStatus {
+		case "TO":
+			status = execution.TIME_LIMIT_EXCEEDED
+		case "RE":
+			status = execution.RUNTIME_ERROR
+		case "SG":
+			status = execution.SIGNAL_ERROR
+		case "XX":
+			status = execution.GRADER_ERROR
+		}
+
+		if t.limits.Memory != 0 && metadata.Memory > t.limits.Memory {
+			status = execution.MEMORY_LIMIT_EXCEEDED
+		}
+
+	}
+
+	return output, &testcaseMetadata{
+		status:   status,
+		walltime: metadata.WallTime,
+		memory:   metadata.Memory,
+	}, nil
+}
+
+func (t *testcaseGroupRunner) CompareOutput(output, expected string) (compareResult string, err error) {
+	instance := t.isolateService.NewInstance()
+	defer func() {
+		if _err := instance.Cleanup(); _err != nil {
+			err = errors.Join(err, fmt.Errorf("cleanup error: %w", _err))
+		}
+	}()
+
+	err = instance.CreateFile("output", output, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	err = instance.CreateFile("sol_output", expected, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	output, err = instance.Run(t.compare.Path, "", nil)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitCode() != 1 {
+				return "", err
+			}
+		}
+	}
+
+	return instance.GetCompareResult()
 }

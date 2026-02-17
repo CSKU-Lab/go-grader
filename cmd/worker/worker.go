@@ -345,7 +345,7 @@ func main() {
 				logger.Errorw("Cannot publish run result to the queue", "error", err)
 			}
 
-			logger.Infow("Runner finished", "result", result)
+			logger.Info("Runner finished")
 			return nil
 		})
 		if err != nil {
