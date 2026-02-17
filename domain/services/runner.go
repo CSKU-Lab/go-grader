@@ -46,7 +46,7 @@ func getRunners() ([]models.LocalRunner, error) {
 		return nil, err
 	}
 
-	var languages []models.LocalRunner
+	var runners []models.LocalRunner
 
 	for _, file := range entries {
 		needCompile, err := isNeedCompile(constants.RUNNER_DIR + "/" + file.Name())
@@ -54,14 +54,14 @@ func getRunners() ([]models.LocalRunner, error) {
 			return nil, err
 		}
 
-		languages = append(languages, models.LocalRunner{
+		runners = append(runners, models.LocalRunner{
 			ID:          file.Name(),
 			Path:        constants.RUNNER_DIR + "/" + file.Name(),
 			NeedCompile: needCompile,
 		})
 	}
 
-	return languages, nil
+	return runners, nil
 }
 
 func (l *RunnerService) GetByID(ID string) (*models.LocalRunner, error) {
