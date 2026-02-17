@@ -231,7 +231,7 @@ func (r *executor) Grade(ctx context.Context) (*models.GradeResult, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
-			if metadata.SomeTestCaseFailed && status != execution.RUN_FAILED {
+			if metadata.SomeTestCaseFailed {
 				status = execution.RUN_FAILED
 			}
 
@@ -391,19 +391,14 @@ func (t *testcaseGroupRunner) RunTestCase(ctx context.Context, tc *models.TestCa
 	}
 
 	output, err = instance.Run(ctx, t.runner.Path, tc.Input, t.limits)
-	if err != nil {
-		return output,
-			&testcaseMetadata{
-				status: execution.GRADER_ERROR,
-			},
-			nil
-	}
 
-	metadata, err := instance.GetMetadata()
-	if err != nil {
-		return "", &testcaseMetadata{
+	// Always try to get metadata, even if Run returned an error
+	// because isolate may have written metadata before timing out
+	metadata, metadataErr := instance.GetMetadata()
+	if metadataErr != nil {
+		return output, &testcaseMetadata{
 			status: execution.GRADER_ERROR,
-		}, err
+		}, metadataErr
 	}
 
 	status := execution.RUN_PASSED
@@ -422,7 +417,16 @@ func (t *testcaseGroupRunner) RunTestCase(ctx context.Context, tc *models.TestCa
 		if t.limits.Memory != 0 && metadata.Memory > t.limits.Memory {
 			status = execution.MEMORY_LIMIT_EXCEEDED
 		}
+	}
 
+	// If Run returned an error and we don't have a specific status from metadata,
+	// then it's a grader error
+	if err != nil && status == execution.RUN_PASSED {
+		return output, &testcaseMetadata{
+			status:   execution.GRADER_ERROR,
+			walltime: metadata.WallTime,
+			memory:   metadata.Memory,
+		}, nil
 	}
 
 	return output, &testcaseMetadata{
