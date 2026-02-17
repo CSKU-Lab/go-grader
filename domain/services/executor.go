@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"runtime"
 	"sync"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
@@ -141,7 +140,7 @@ func (r *executorBuilder) Build() (*executor, execution.Status) {
 }
 
 func (r *executor) Run() (*models.RunResult, error) {
-	instance := r.isolateService.NewInstance()
+	instance := r.isolateService.NewRunInstance()
 	defer func() {
 		if err := instance.Cleanup(); err != nil {
 			r.logger.Fatalw("Cleanup error", "error", err.Error())
@@ -311,8 +310,6 @@ func (t *testcaseGroupRunner) Result() (*models.TestCaseGroupResult, *runMetadat
 		return nil, nil, err
 	}
 
-	t.logger.Infow("Go routine counts", "count", runtime.NumGoroutine())
-
 	score := t.score
 	if isSomeTestCaseFailed {
 		score = 0
@@ -369,7 +366,7 @@ type testcaseMetadata struct {
 }
 
 func (t *testcaseGroupRunner) RunTestCase(tc *models.TestCase) (output string, tcMet *testcaseMetadata, err error) {
-	instance := t.isolateService.NewInstance()
+	instance := t.isolateService.NewGradeInstance()
 	defer func() {
 		if _err := instance.Cleanup(); _err != nil {
 			err = errors.Join(err, fmt.Errorf("cleanup error: %w", _err))
@@ -437,7 +434,7 @@ func (t *testcaseGroupRunner) RunTestCase(tc *models.TestCase) (output string, t
 }
 
 func (t *testcaseGroupRunner) CompareOutput(output, expected string) (compareResult string, err error) {
-	instance := t.isolateService.NewInstance()
+	instance := t.isolateService.NewGradeInstance()
 	defer func() {
 		if _err := instance.Cleanup(); _err != nil {
 			err = errors.Join(err, fmt.Errorf("cleanup error: %w", _err))

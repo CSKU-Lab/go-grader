@@ -135,7 +135,7 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 	isolateService := services.NewIsolateService(context.Background(), logger, len(compares), 0)
 	for _, compare := range compares {
 		wg.Go(func() {
-			runner := isolateService.NewInstance()
+			runner := isolateService.NewRunInstance()
 
 			comparePath := path.Join(constants.COMPARE_DIR, compare.ID)
 

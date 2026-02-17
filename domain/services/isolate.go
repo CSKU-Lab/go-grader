@@ -15,24 +15,32 @@ import (
 )
 
 type IsolateService struct {
-	ctx    context.Context
-	boxIds chan int
-	logger *zap.SugaredLogger
-}
-
-func getBoxPoolAmount(rq int, gq int) int {
-	gradeMaxUsage := gq * 2 // need to be double for compare
-	return gradeMaxUsage + rq
+	ctx         context.Context
+	runBoxIds   chan int
+	gradeBoxIds chan int
+	logger      *zap.SugaredLogger
 }
 
 func NewIsolateService(ctx context.Context, logger *zap.SugaredLogger, runQueueAmount int, gradeQueueAmount int) *IsolateService {
-	pool := getBoxPoolAmount(runQueueAmount, gradeQueueAmount)
-	boxIds := make(chan int, pool)
-	for i := range pool {
-		boxIds <- i
+	// Run pool: IDs 0 to runQueueAmount-1
+	runBoxIds := make(chan int, runQueueAmount)
+	for i := 0; i < runQueueAmount; i++ {
+		runBoxIds <- i
 	}
 
-	return &IsolateService{ctx: ctx, boxIds: boxIds, logger: logger}
+	// Grade pool: IDs runQueueAmount to runQueueAmount + (gradeQueueAmount*2) - 1
+	gradePoolSize := gradeQueueAmount * 2
+	gradeBoxIds := make(chan int, gradePoolSize)
+	for i := 0; i < gradePoolSize; i++ {
+		gradeBoxIds <- runQueueAmount + i
+	}
+
+	return &IsolateService{
+		ctx:         ctx,
+		runBoxIds:   runBoxIds,
+		gradeBoxIds: gradeBoxIds,
+		logger:      logger,
+	}
 }
 
 type IsolateInstance struct {
@@ -45,8 +53,8 @@ type IsolateInstance struct {
 	logger       *zap.SugaredLogger
 }
 
-func (s *IsolateService) NewInstance() *IsolateInstance {
-	boxID := <-s.boxIds
+func (s *IsolateService) NewRunInstance() *IsolateInstance {
+	boxID := <-s.runBoxIds
 
 	instance := IsolateInstance{
 		ctx:          s.ctx,
@@ -54,7 +62,25 @@ func (s *IsolateService) NewInstance() *IsolateInstance {
 		boxPath:      fmt.Sprintf(constants.SANDBOX_PATH+"/box", boxID),
 		metadataPath: fmt.Sprintf(constants.SANDBOX_PATH+"/metadata", boxID),
 		comparePath:  fmt.Sprintf(constants.SANDBOX_PATH+"/compare", boxID),
-		boxIds:       s.boxIds,
+		boxIds:       s.runBoxIds,
+		logger:       s.logger,
+	}
+
+	instance.init()
+
+	return &instance
+}
+
+func (s *IsolateService) NewGradeInstance() *IsolateInstance {
+	boxID := <-s.gradeBoxIds
+
+	instance := IsolateInstance{
+		ctx:          s.ctx,
+		boxID:        boxID,
+		boxPath:      fmt.Sprintf(constants.SANDBOX_PATH+"/box", boxID),
+		metadataPath: fmt.Sprintf(constants.SANDBOX_PATH+"/metadata", boxID),
+		comparePath:  fmt.Sprintf(constants.SANDBOX_PATH+"/compare", boxID),
+		boxIds:       s.gradeBoxIds,
 		logger:       s.logger,
 	}
 
