@@ -208,7 +208,6 @@ func (r *executor) Grade(ctx context.Context) (*models.GradeResult, error) {
 	testCaseGroupResults := make([]models.TestCaseGroupResult, 0, len(r.testCaseGroups))
 	var mu sync.Mutex
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(30)
 	for _, tcg := range r.testCaseGroups {
 		eg.Go(func() error {
 			tcgRunner := &testcaseGroupRunner{
@@ -231,7 +230,7 @@ func (r *executor) Grade(ctx context.Context) (*models.GradeResult, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
-			if metadata.SomeTestCaseFailed {
+			if metadata.SomeTestCaseFailed && status != execution.RUN_FAILED {
 				status = execution.RUN_FAILED
 			}
 
@@ -283,7 +282,6 @@ func (t *testcaseGroupRunner) Result(ctx context.Context) (*models.TestCaseGroup
 
 	var mu sync.Mutex
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(30)
 	for _, tc := range t.tcs {
 		eg.Go(func() error {
 			result, err := t.GetTestCaseResult(ctx, &tc)
@@ -391,14 +389,19 @@ func (t *testcaseGroupRunner) RunTestCase(ctx context.Context, tc *models.TestCa
 	}
 
 	output, err = instance.Run(ctx, t.runner.Path, tc.Input, t.limits)
+	if err != nil {
+		return output,
+			&testcaseMetadata{
+				status: execution.GRADER_ERROR,
+			},
+			nil
+	}
 
-	// Always try to get metadata, even if Run returned an error
-	// because isolate may have written metadata before timing out
-	metadata, metadataErr := instance.GetMetadata()
-	if metadataErr != nil {
-		return output, &testcaseMetadata{
+	metadata, err := instance.GetMetadata()
+	if err != nil {
+		return "", &testcaseMetadata{
 			status: execution.GRADER_ERROR,
-		}, metadataErr
+		}, err
 	}
 
 	status := execution.RUN_PASSED
@@ -417,16 +420,7 @@ func (t *testcaseGroupRunner) RunTestCase(ctx context.Context, tc *models.TestCa
 		if t.limits.Memory != 0 && metadata.Memory > t.limits.Memory {
 			status = execution.MEMORY_LIMIT_EXCEEDED
 		}
-	}
 
-	// If Run returned an error and we don't have a specific status from metadata,
-	// then it's a grader error
-	if err != nil && status == execution.RUN_PASSED {
-		return output, &testcaseMetadata{
-			status:   execution.GRADER_ERROR,
-			walltime: metadata.WallTime,
-			memory:   metadata.Memory,
-		}, nil
 	}
 
 	return output, &testcaseMetadata{
