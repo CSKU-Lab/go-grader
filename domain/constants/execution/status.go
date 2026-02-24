@@ -12,7 +12,6 @@ const (
 	SIGNAL_ERROR          Status = "SIGNAL_ERROR"
 	GRADER_ERROR          Status = "GRADER_ERROR"
 	FILE_NOT_FOUND        Status = "FILE_NOT_FOUND"
-	BUILD_PASSED          Status = "BUILD_PASSED"
 	QUEUED                Status = "QUEUED"
 	RUNNING               Status = "RUNNING"
 )

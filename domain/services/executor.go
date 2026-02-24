@@ -40,7 +40,7 @@ type ExecutorBuilder interface {
 	Limits(limits *models.Limit) ExecutorBuilder
 	TestCaseGroups(testCases []models.TestCaseGroup) ExecutorBuilder
 	CompareID(ID string) ExecutorBuilder
-	Build() (*executor, execution.Status)
+	Build() (*executor, error)
 }
 
 type executor struct {
@@ -108,9 +108,9 @@ func (r *executorBuilder) TestCaseGroups(testCaseGroups []models.TestCaseGroup) 
 	return r
 }
 
-func (r *executorBuilder) Build() (*executor, execution.Status) {
+func (r *executorBuilder) Build() (*executor, error) {
 	if r.files == nil {
-		return nil, execution.FILE_NOT_FOUND
+		return nil, errors.New("files are required")
 	}
 
 	exec := &executor{
@@ -124,7 +124,7 @@ func (r *executorBuilder) Build() (*executor, execution.Status) {
 
 	runner, err := r.runnerService.GetByID(r.runnerID)
 	if err != nil {
-		return nil, execution.GRADER_ERROR
+		return nil, errors.New("runner not found")
 	}
 
 	exec.runner = runner
@@ -132,12 +132,12 @@ func (r *executorBuilder) Build() (*executor, execution.Status) {
 	if r.compareID != "" {
 		compare, err := r.compareService.GetByID(r.compareID)
 		if err != nil {
-			return nil, execution.GRADER_ERROR
+			return nil, errors.New("compare not found")
 		}
 		exec.compare = compare
 	}
 
-	return exec, execution.BUILD_PASSED
+	return exec, nil
 }
 
 func (r *executor) Run(ctx context.Context) (*models.RunResult, error) {
