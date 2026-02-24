@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func main() {
@@ -45,9 +44,11 @@ func main() {
 	taskGRPC, closeTask := initTaskServerClient(logger, env.GetTaskServerURL())
 	defer closeTask()
 
-	var runnerRes *configPB.GetRunnersResponse
+	var runnerRes *configPB.GetAllRunnersResponse
 	for i := range 5 {
-		runnerRes, err = configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
+		runnerRes, err = configGRPC.GetAllRunners(ctx, &configPB.GetAllRunnersRequest{
+			IncludeScripts: true,
+		})
 		if err == nil {
 			break
 		}
@@ -58,9 +59,12 @@ func main() {
 		logger.Fatalw("Cannot get runners from gRPC server after retries", "error", err)
 	}
 
-	var compareRes *configPB.GetComparesResponse
+	var compareRes *configPB.GetAllComparesResponse
 	for i := range 5 {
-		compareRes, err = configGRPC.GetCompares(ctx, &emptypb.Empty{})
+		compareRes, err = configGRPC.GetAllCompares(ctx, &configPB.GetAllComparesRequest{
+			IncludeFiles:   true,
+			IncludeScripts: true,
+		})
 		if err == nil {
 			break
 		}
@@ -90,6 +94,12 @@ func main() {
 	})
 	if err != nil {
 		logger.Fatalw("Cannot create 'run' queue", "error", err)
+	}
+	_, err = q.CreateQueue(ctx, "runner_test", &queue.QueueOptions{
+		Durable: true,
+	})
+	if err != nil {
+		logger.Fatalw("Cannot create 'runner_test' queue", "error", err)
 	}
 
 	setup.Init(logger, runners, compares)
@@ -123,13 +133,18 @@ func main() {
 			case broadcast.REFETCH_CONFIG:
 				logger.Info("Received broadcast: refetch config")
 
-				runnerRes, err := configGRPC.GetRunners(ctx, &configPB.GetRunnersRequest{})
+				runnerRes, err := configGRPC.GetAllRunners(ctx, &configPB.GetAllRunnersRequest{
+					IncludeScripts: true,
+				})
 				if err != nil {
 					logger.Errorw("Failed to refetch runners", "error", err)
 					return err
 				}
 
-				compareRes, err := configGRPC.GetCompares(ctx, &emptypb.Empty{})
+				compareRes, err := configGRPC.GetAllCompares(ctx, &configPB.GetAllComparesRequest{
+					IncludeScripts: true,
+					IncludeFiles:   true,
+				})
 				if err != nil {
 					logger.Errorw("Failed to refetch compares", "error", err)
 					return err
@@ -179,18 +194,17 @@ func main() {
 			logger.Infow("Received run request", "payload", payload.RunnerID)
 
 			exService := *executorHolder.Get()
-			executor, status := exService.NewExecutor().
+			executor, err := exService.NewExecutor().
 				RunnerID(payload.RunnerID).
 				Files(payload.Files).
 				Input(payload.Input).
 				Limits(payload.Limit).
 				Build()
 
-			switch status == execution.BUILD_PASSED {
-			case false:
+			if err != nil {
 				bytesResult, err := json.Marshal(models.RunResult{
 					ID:     payload.ID,
-					Status: status,
+					Status: execution.GRADER_ERROR,
 				})
 				if err != nil {
 					logger.Errorw("Cannot marshal run result", "error", err)
@@ -282,19 +296,17 @@ func main() {
 			}
 
 			exService := *executorHolder.Get()
-			executor, status := exService.NewExecutor().
+			executor, err := exService.NewExecutor().
 				RunnerID(payload.RunnerID).
 				Files(payload.Files).
 				TestCaseGroups(testcaseGroupsPbToModel(task.GetTestCaseGroups())).
 				Limits(limit).
 				CompareID(task.GetCompareScriptId()).
 				Build()
-
-			switch status == execution.BUILD_PASSED {
-			case false:
+			if err != nil {
 				bytesResult, err := json.Marshal(models.RunResult{
 					ID:     payload.ID,
-					Status: status,
+					Status: execution.GRADER_ERROR,
 				})
 				if err != nil {
 					logger.Errorw("Cannot marshal run result", "error", err)
@@ -353,6 +365,114 @@ func main() {
 		}
 	})
 
+	wg.Go(func() {
+		err := q.Consume(ctx, "runner_test", 1, true, func(derivery *queue.Derivery, exit chan struct{}) error {
+			result := models.RunResult{
+				ID: derivery.CorrelationID,
+			}
+
+			publish := func() error {
+				resultBytes, err := json.Marshal(result)
+				if err != nil {
+					return err
+				}
+				return q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					CorrelationID: derivery.CorrelationID,
+					Body:          []byte(resultBytes),
+				})
+			}
+
+			payload := &models.RunnerTestExecution{}
+			err := json.Unmarshal(derivery.Body, payload)
+			if err != nil {
+				return err
+			}
+
+			instance := isolateService.NewRunInstance()
+			logger.Infoln(instance.BoxPath())
+			// defer instance.Cleanup()
+
+			result.Status = execution.RUNNING
+			if err = publish(); err != nil {
+				return err
+			}
+
+			for _, file := range payload.InitialFiles {
+				err = instance.CreateFile(file.Name, file.Content, 0600)
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					if err = publish(); err != nil {
+						return err
+					}
+					return err
+				}
+			}
+
+			if payload.BuildScript != "" {
+				err = instance.CreateFile("build_script.sh", payload.BuildScript, 0700)
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					if err = publish(); err != nil {
+						return err
+					}
+					return err
+				}
+
+				_, err := instance.Compile(ctx)
+				if err != nil {
+					result.Status = execution.COMPILE_FAILED
+					if err = publish(); err != nil {
+						return err
+					}
+					return err
+				}
+			}
+
+			err = instance.CreateFile("run_script.sh", payload.RunScript, 0700)
+			if err != nil {
+				result.Status = execution.GRADER_ERROR
+				if err = publish(); err != nil {
+					return err
+				}
+				return err
+			}
+
+			result.Status = execution.RUN_PASSED
+			if err = publish(); err != nil {
+				return err
+			}
+
+			// output, err := instance.Run(ctx, "", payload.Input, nil)
+			// if err != nil {
+			// 	log.Println("Error from runner test instance:", err)
+			// 	result.Status = execution.RUNTIME_ERROR
+			// 	if err = publish(); err != nil {
+			// 		return err
+			// 	}
+			// 	return err
+			// }
+			//
+			// result.Output = output
+			//
+			// metadata, err := instance.GetMetadata()
+			// if err != nil {
+			// 	result.Status = execution.GRADER_ERROR
+			// 	if err = publish(); err != nil {
+			// 		return err
+			// 	}
+			// 	return err
+			// }
+			//
+			// result.WallTime = metadata.WallTime
+			// result.Memory = metadata.Memory
+
+			return nil
+		})
+		if err != nil {
+			logger.Errorw("runner_test consumer error", "error", err)
+		}
+	})
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
@@ -399,7 +519,7 @@ func initTaskServerClient(logger *zap.SugaredLogger, clientAddr string) (client 
 	}
 }
 
-func runnerPbToModel(languages []*configPB.Runner) []models.RunnerConfig {
+func runnerPbToModel(languages []*configPB.RunnerResponse) []models.RunnerConfig {
 	_runners := make([]models.RunnerConfig, 0, 10)
 	for _, lang := range languages {
 		_runners = append(_runners, models.RunnerConfig{
