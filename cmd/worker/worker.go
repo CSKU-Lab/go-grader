@@ -389,8 +389,8 @@ func main() {
 			}
 
 			instance := isolateService.NewRunInstance()
-			logger.Infoln(instance.BoxPath())
-			// defer instance.Cleanup()
+			instance.Init(ctx)
+			defer instance.Cleanup()
 
 			result.Status = execution.RUNNING
 			if err = publish(); err != nil {
@@ -401,10 +401,10 @@ func main() {
 				err = instance.CreateFile(file.Name, file.Content, 0600)
 				if err != nil {
 					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
 					if err = publish(); err != nil {
 						return err
 					}
-					return err
 				}
 			}
 
@@ -412,61 +412,55 @@ func main() {
 				err = instance.CreateFile("build_script.sh", payload.BuildScript, 0700)
 				if err != nil {
 					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
 					if err = publish(); err != nil {
 						return err
 					}
-					return err
 				}
 
-				_, err := instance.Compile(ctx)
+				output, err := instance.Compile(ctx)
 				if err != nil {
 					result.Status = execution.COMPILE_FAILED
+					result.Output = output
 					if err = publish(); err != nil {
 						return err
 					}
-					return err
 				}
 			}
 
 			err = instance.CreateFile("run_script.sh", payload.RunScript, 0700)
 			if err != nil {
 				result.Status = execution.GRADER_ERROR
+				result.Output = err.Error()
 				if err = publish(); err != nil {
 					return err
 				}
-				return err
 			}
 
+			output, err := instance.Run(ctx, "run_script.sh", payload.Input, nil)
+			if err != nil {
+				result.Status = execution.RUNTIME_ERROR
+				result.Output = output
+				if err = publish(); err != nil {
+					return err
+				}
+			}
+
+			metadata, err := instance.GetMetadata()
+			if err != nil {
+				result.Status = execution.GRADER_ERROR
+				result.Output = err.Error()
+				if err = publish(); err != nil {
+					return err
+				}
+			}
+
+			result.Output = output
 			result.Status = execution.RUN_PASSED
-			if err = publish(); err != nil {
-				return err
-			}
+			result.WallTime = metadata.WallTime
+			result.Memory = metadata.Memory
 
-			// output, err := instance.Run(ctx, "", payload.Input, nil)
-			// if err != nil {
-			// 	log.Println("Error from runner test instance:", err)
-			// 	result.Status = execution.RUNTIME_ERROR
-			// 	if err = publish(); err != nil {
-			// 		return err
-			// 	}
-			// 	return err
-			// }
-			//
-			// result.Output = output
-			//
-			// metadata, err := instance.GetMetadata()
-			// if err != nil {
-			// 	result.Status = execution.GRADER_ERROR
-			// 	if err = publish(); err != nil {
-			// 		return err
-			// 	}
-			// 	return err
-			// }
-			//
-			// result.WallTime = metadata.WallTime
-			// result.Memory = metadata.Memory
-
-			return nil
+			return publish()
 		})
 		if err != nil {
 			logger.Errorw("runner_test consumer error", "error", err)

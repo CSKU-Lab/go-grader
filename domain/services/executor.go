@@ -164,7 +164,7 @@ func (r *executor) Run(ctx context.Context) (*models.RunResult, error) {
 		}
 	}
 
-	output, err := instance.Run(ctx, r.runner.Path, r.input, r.limits)
+	output, err := instance.RunFromDir(ctx, r.runner.Path, r.input, r.limits)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -388,7 +388,7 @@ func (t *testcaseGroupRunner) RunTestCase(ctx context.Context, tc *models.TestCa
 		}
 	}
 
-	output, err = instance.Run(ctx, t.runner.Path, tc.Input, t.limits)
+	output, err = instance.RunFromDir(ctx, t.runner.Path, tc.Input, t.limits)
 	if err != nil {
 		return output,
 			&testcaseMetadata{
@@ -447,7 +447,7 @@ func (t *testcaseGroupRunner) CompareOutput(ctx context.Context, output, expecte
 		return "", err
 	}
 
-	output, err = instance.Run(ctx, t.compare.Path, "", nil)
+	output, err = instance.RunFromDir(ctx, t.compare.Path, "", nil)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {

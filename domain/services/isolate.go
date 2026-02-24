@@ -173,7 +173,7 @@ func (i *IsolateInstance) Compile(ctx context.Context) (string, error) {
 
 	output, err := i.execute(ctx, args...)
 	if err != nil {
-		i.log("Compile error : %s", err.Error())
+		i.log("Compile error : %s", output)
 		return output, err
 	}
 
@@ -207,6 +207,43 @@ func (i *IsolateInstance) CompileUsing(ctx context.Context, scriptDir string) (s
 }
 
 func (i *IsolateInstance) Run(ctx context.Context, scriptDir string, input string, limit *models.Limit) (string, error) {
+	i.log("Running program...")
+	_limits := getLimitArgs(limit)
+
+	args := []string{
+		"--meta=" + i.metadataPath,
+		"--processes=100",
+		"--stderr-to-stdout",
+		"--run",
+		"--",
+		"run_script.sh",
+	}
+
+	args = append(_limits, args...)
+
+	var output string
+	var err error
+
+	if input != "" {
+		output, err = i.executeWithInput(ctx, input, args...)
+	} else {
+		output, err = i.execute(ctx, args...)
+	}
+
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// recheck if the command you ran with isolate command is exist
+			if exitErr.ExitCode() == 127 {
+				return output, errors.New("the command you pass to isolate is not exist")
+			}
+		}
+		return output, err
+	}
+	return output, nil
+}
+
+func (i *IsolateInstance) RunFromDir(ctx context.Context, scriptDir string, input string, limit *models.Limit) (string, error) {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
