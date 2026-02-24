@@ -14,3 +14,10 @@ type RunExecution struct {
 	RunnerID string `json:"runner_id"`
 	Limit    *Limit `json:"limit"`
 }
+
+type RunnerTestExecution struct {
+	InitialFiles []File `json:"initial_files"`
+	Input        string `json:"input"`
+	RunScript    string `json:"run_script"`
+	BuildScript  string `json:"build_script"`
+}
