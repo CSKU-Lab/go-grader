@@ -101,6 +101,12 @@ func main() {
 	if err != nil {
 		logger.Fatalw("Cannot create 'runner_test' queue", "error", err)
 	}
+	_, err = q.CreateQueue(ctx, "broadcast", &queue.QueueOptions{
+		Durable: true,
+	})
+	if err != nil {
+		logger.Fatalw("Cannot create 'broadcast' queue", "error", err)
+	}
 
 	setup.Init(logger, runners, compares)
 
