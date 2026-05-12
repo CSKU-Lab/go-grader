@@ -243,7 +243,7 @@ func (i *IsolateInstance) Run(ctx context.Context, scriptDir string, input strin
 	return output, nil
 }
 
-func (i *IsolateInstance) RunFromDir(ctx context.Context, scriptDir string, input string, limit *models.Limit) (string, error) {
+func (i *IsolateInstance) RunFromDir(ctx context.Context, scriptDir string, input string, limit *models.Limit, envVars ...string) (string, error) {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
 
@@ -252,11 +252,13 @@ func (i *IsolateInstance) RunFromDir(ctx context.Context, scriptDir string, inpu
 		fmt.Sprintf("--dir=%s", scriptDir),
 		"--processes=100",
 		"--stderr-to-stdout",
-		"--run",
-		"--",
-		fmt.Sprintf("%s/run_script.sh", scriptDir),
 	}
 
+	for _, env := range envVars {
+		args = append(args, fmt.Sprintf("--env=%s", env))
+	}
+
+	args = append(args, "--run", "--", fmt.Sprintf("%s/run_script.sh", scriptDir))
 	args = append(_limits, args...)
 
 	var output string

@@ -447,7 +447,10 @@ func (t *testcaseGroupRunner) CompareOutput(ctx context.Context, output, expecte
 		return "", err
 	}
 
-	output, err = instance.RunFromDir(ctx, t.compare.Path, "", nil)
+	output, err = instance.RunFromDir(ctx, t.compare.Path, "", nil,
+		"OUTPUT=/output",
+		"SOL_OUTPUT=/sol_output",
+	)
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
