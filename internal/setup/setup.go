@@ -135,6 +135,11 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 	isolateService := services.NewIsolateService(logger, len(compares), 0)
 	for _, compare := range compares {
 		wg.Go(func() {
+			if compare.RunName == "" || len(compare.Files) == 0 {
+				logger.Warnf("[setupCompares] %s skipped: not fully configured (run_name=%q, files=%d)", compare.ID, compare.RunName, len(compare.Files))
+				return
+			}
+
 			ctx := context.Background()
 			runner := isolateService.NewRunInstance()
 			runner.Init(ctx)
@@ -164,17 +169,34 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 					logger.Fatalf("Cannot build compare script for %s : %s", compare.ID, err)
 				}
 
+				if _, statErr := os.Stat(exePath); os.IsNotExist(statErr) {
+					logger.Warnf("[setupCompares] %s skipped: build script ran but produced no %q output — configure the compare script first", compare.ID, compare.RunName)
+					runner.Cleanup()
+					os.RemoveAll(comparePath)
+					return
+				}
+
 				err = file.MoveFile(exePath, scriptPath)
 				if err != nil {
 					logger.Fatalf("Cannot move compare script %s : %s", compare.ID, err)
 				}
 			} else {
-				for _, file := range compare.Files {
-					replacedContent := replaceEnv(file.Content, scriptPath)
-					err := os.WriteFile(path.Join(comparePath, file.Name), []byte(replacedContent), 0655)
-					if err != nil {
-						logger.Fatalf("Cannot write %s file %s : %s", compare.ID, file.Name, err)
+				hasRunFile := false
+				for _, f := range compare.Files {
+					if f.Name == compare.RunName {
+						hasRunFile = true
 					}
+					replacedContent := replaceEnv(f.Content, scriptPath)
+					err := os.WriteFile(path.Join(comparePath, f.Name), []byte(replacedContent), 0655)
+					if err != nil {
+						logger.Fatalf("Cannot write %s file %s : %s", compare.ID, f.Name, err)
+					}
+				}
+				if !hasRunFile {
+					logger.Warnf("[setupCompares] %s skipped: no file named %q found in sandbox — configure the compare script first", compare.ID, compare.RunName)
+					runner.Cleanup()
+					os.RemoveAll(comparePath)
+					return
 				}
 			}
 
@@ -196,6 +218,9 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 func writeToComparesJson(compares []models.CompareConfig) error {
 	var localCompares []models.LocalCompare
 	for _, compare := range compares {
+		if compare.RunName == "" || len(compare.Files) == 0 {
+			continue
+		}
 		localCompares = append(localCompares, models.LocalCompare{
 			ID:      compare.ID,
 			RunName: compare.RunName,

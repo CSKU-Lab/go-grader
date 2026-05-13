@@ -21,3 +21,12 @@ type RunnerTestExecution struct {
 	RunScript    string `json:"run_script"`
 	BuildScript  string `json:"build_script"`
 }
+
+type CompareTestExecution struct {
+	Files       []File `json:"files"`
+	BuildScript string `json:"build_script"`
+	RunScript   string `json:"run_script"`
+	RunName     string `json:"run_name"`
+	SolOutput   string `json:"sol_output"`
+	Output      string `json:"output"`
+}

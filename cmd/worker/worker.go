@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -100,6 +101,12 @@ func main() {
 	})
 	if err != nil {
 		logger.Fatalw("Cannot create 'runner_test' queue", "error", err)
+	}
+	_, err = q.CreateQueue(ctx, "compare_test", &queue.QueueOptions{
+		Durable: true,
+	})
+	if err != nil {
+		logger.Fatalw("Cannot create 'compare_test' queue", "error", err)
 	}
 	_, err = q.CreateQueue(ctx, "broadcast", &queue.QueueOptions{
 		Durable: true,
@@ -470,6 +477,123 @@ func main() {
 		})
 		if err != nil {
 			logger.Errorw("runner_test consumer error", "error", err)
+		}
+	})
+
+	wg.Go(func() {
+		err := q.Consume(ctx, "compare_test", 1, true, func(derivery *queue.Derivery, exit chan struct{}) error {
+			result := models.RunResult{
+				ID: derivery.CorrelationID,
+			}
+
+			publish := func() error {
+				resultBytes, err := json.Marshal(result)
+				if err != nil {
+					return err
+				}
+				return q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					CorrelationID: derivery.CorrelationID,
+					Body:          resultBytes,
+				})
+			}
+
+			payload := &models.CompareTestExecution{}
+			err := json.Unmarshal(derivery.Body, payload)
+			if err != nil {
+				return err
+			}
+
+			if payload.RunName == "" {
+				result.Status = execution.GRADER_ERROR
+				result.Output = "run_name is required: set a Run Name in the compare script settings"
+				return publish()
+			}
+
+			if payload.RunScript == "" {
+				result.Status = execution.GRADER_ERROR
+				result.Output = "run_script.sh content is required"
+				return publish()
+			}
+
+			instance := isolateService.NewRunInstance()
+			instance.Init(ctx)
+			defer instance.Cleanup()
+
+			result.Status = execution.RUNNING
+			if err = publish(); err != nil {
+				return err
+			}
+
+			for _, file := range payload.Files {
+				err = instance.CreateFile(file.Name, file.Content, 0644)
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
+					return publish()
+				}
+			}
+
+			err = instance.CreateFile("sol_output", payload.SolOutput, 0644)
+			if err != nil {
+				result.Status = execution.GRADER_ERROR
+				result.Output = err.Error()
+				return publish()
+			}
+
+			err = instance.CreateFile("output", payload.Output, 0644)
+			if err != nil {
+				result.Status = execution.GRADER_ERROR
+				result.Output = err.Error()
+				return publish()
+			}
+
+			if payload.BuildScript != "" {
+				err = instance.CreateFile("build_script.sh", payload.BuildScript, 0700)
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
+					return publish()
+				}
+
+				output, err := instance.Compile(ctx)
+				if err != nil {
+					result.Status = execution.COMPILE_FAILED
+					result.Output = output
+					return publish()
+				}
+			}
+
+			preamble := fmt.Sprintf(
+				"#!/bin/bash\n"+
+					"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"+
+					"export RUN_NAME=/box/%s\n"+
+					"export OUTPUT=/box/output\n"+
+					"export SOL_OUTPUT=/box/sol_output\n",
+				payload.RunName,
+			)
+			err = instance.CreateFile("run_script.sh", preamble+payload.RunScript, 0700)
+			if err != nil {
+				result.Status = execution.GRADER_ERROR
+				result.Output = err.Error()
+				return publish()
+			}
+
+			output, exitCode, err := instance.RunCompare(ctx)
+			result.ExitCode = exitCode
+			if err != nil {
+				result.Status = execution.RUNTIME_ERROR
+				result.Output = output
+				return publish()
+			}
+
+			compareResult, _ := instance.GetCompareResult()
+			result.Output = output
+			result.CompareResult = compareResult
+			result.Status = execution.RUN_PASSED
+			return publish()
+		})
+		if err != nil {
+			logger.Errorw("compare_test consumer error", "error", err)
 		}
 	})
 

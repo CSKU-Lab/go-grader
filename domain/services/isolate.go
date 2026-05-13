@@ -243,6 +243,96 @@ func (i *IsolateInstance) Run(ctx context.Context, scriptDir string, input strin
 	return output, nil
 }
 
+func (i *IsolateInstance) RunWithEnvVars(ctx context.Context, limit *models.Limit, envVars ...string) (string, error) {
+	i.log("Running program with env vars...")
+	_limits := getLimitArgs(limit)
+
+	args := []string{
+		"--meta=" + i.metadataPath,
+		"--processes=100",
+		"--stderr-to-stdout",
+	}
+
+	for _, env := range envVars {
+		args = append(args, fmt.Sprintf("--env=%s", env))
+	}
+
+	args = append(args, "--run", "--", "run_script.sh")
+	args = append(_limits, args...)
+
+	output, err := i.execute(ctx, args...)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitCode() == 127 {
+				return output, errors.New("the command you pass to isolate is not exist")
+			}
+			// exit 1 is normal for compare scripts indicating mismatch
+			if exitErr.ExitCode() == 1 {
+				return output, nil
+			}
+		}
+		return output, err
+	}
+	return output, nil
+}
+
+func (i *IsolateInstance) RunCompare(ctx context.Context) (output string, exitCode int, err error) {
+	i.log("Running compare script...")
+
+	args := []string{
+		"--meta=" + i.metadataPath,
+		"--processes=100",
+		"--stderr-to-stdout",
+		"--run", "--", "run_script.sh",
+	}
+
+	output, err = i.execute(ctx, args...)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitCode = exitErr.ExitCode()
+			if exitCode == 127 {
+				return output, exitCode, errors.New("the command you pass to isolate is not exist")
+			}
+			return output, exitCode, nil
+		}
+		return output, -1, err
+	}
+	return output, 0, nil
+}
+
+func (i *IsolateInstance) RunWithDir(ctx context.Context, mountDir string, limit *models.Limit) (string, error) {
+	i.log("Running program with mounted dir %s...", mountDir)
+	_limits := getLimitArgs(limit)
+
+	args := []string{
+		"--meta=" + i.metadataPath,
+		fmt.Sprintf("--dir=%s", mountDir),
+		"--processes=100",
+		"--stderr-to-stdout",
+	}
+
+	args = append(args, "--run", "--", "run_script.sh")
+	args = append(_limits, args...)
+
+	output, err := i.execute(ctx, args...)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitCode() == 127 {
+				return output, errors.New("the command you pass to isolate is not exist")
+			}
+			// exit 1 is normal for compare scripts indicating mismatch
+			if exitErr.ExitCode() == 1 {
+				return output, nil
+			}
+		}
+		return output, err
+	}
+	return output, nil
+}
+
 func (i *IsolateInstance) RunFromDir(ctx context.Context, scriptDir string, input string, limit *models.Limit, envVars ...string) (string, error) {
 	i.log("Running program...")
 	_limits := getLimitArgs(limit)
@@ -296,6 +386,9 @@ func (i *IsolateInstance) GetMetadata() (*models.Metadata, error) {
 func (i *IsolateInstance) GetCompareResult() (string, error) {
 	data, err := os.ReadFile(i.boxPath + "/compare_result.txt")
 	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
 		return "", err
 	}
 	return string(data), nil

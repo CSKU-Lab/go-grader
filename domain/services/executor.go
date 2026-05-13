@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 
@@ -447,17 +448,30 @@ func (t *testcaseGroupRunner) CompareOutput(ctx context.Context, output, expecte
 		return "", err
 	}
 
-	output, err = instance.RunFromDir(ctx, t.compare.Path, "", nil,
-		"OUTPUT=/output",
-		"SOL_OUTPUT=/sol_output",
-	)
+	runScriptContent, err := os.ReadFile(t.compare.Path + "/run_script.sh")
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			if exitErr.ExitCode() != 1 {
-				return "", err
-			}
+		if os.IsNotExist(err) {
+			return fmt.Sprintf("grader error: run_script.sh not found for compare %q — re-save the compare script to rebuild", t.compare.Path), nil
 		}
+		return "", err
+	}
+
+	preamble := fmt.Sprintf(
+		"#!/bin/bash\n"+
+			"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"+
+			"export RUN_NAME=%s/%s\n"+
+			"export OUTPUT=/box/output\n"+
+			"export SOL_OUTPUT=/box/sol_output\n",
+		t.compare.Path, t.compare.RunName,
+	)
+	err = instance.CreateFile("run_script.sh", preamble+string(runScriptContent), 0700)
+	if err != nil {
+		return "", err
+	}
+
+	output, err = instance.RunWithDir(ctx, t.compare.Path, nil)
+	if err != nil {
+		return "", err
 	}
 
 	return instance.GetCompareResult()
