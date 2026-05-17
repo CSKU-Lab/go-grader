@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	cskuotel "github.com/CSKU-Lab/otel"
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants/broadcast"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
@@ -20,6 +21,8 @@ import (
 	"github.com/CSKU-Lab/go-grader/internal/logging"
 	"github.com/CSKU-Lab/go-grader/internal/setup"
 	"github.com/CSKU-Lab/queue"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -35,6 +38,19 @@ func main() {
 			logger.Warnw("failed to flush logger", "error", err)
 		}
 	}()
+
+	otelShutdown, err := cskuotel.Init(context.Background())
+	if err != nil {
+		logger.Warnw("tracing unavailable", "error", err)
+	} else {
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := otelShutdown(shutdownCtx); err != nil {
+				logger.Warnw("tracer shutdown error", "error", err)
+			}
+		}()
+	}
 
 	env := configs.NewEnv(logger)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -196,6 +212,10 @@ func main() {
 
 	wg.Go(func() {
 		err := q.Consume(ctx, "run", env.GetRunQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
+			traceCtx := cskuotel.ExtractTraceContext(derivery.Headers)
+			traceCtx, span := otel.Tracer("go-grader/worker").Start(traceCtx, "worker.run")
+			defer span.End()
+
 			payload := &models.RunExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
@@ -280,6 +300,10 @@ func main() {
 
 	wg.Go(func() {
 		err := q.Consume(ctx, "grade", env.GetGradeQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
+			traceCtx := cskuotel.ExtractTraceContext(derivery.Headers)
+			traceCtx, span := otel.Tracer("go-grader/worker").Start(traceCtx, "worker.grade")
+			defer span.End()
+
 			payload := &models.GradeExecution{}
 
 			err := json.Unmarshal(derivery.Body, payload)
@@ -288,7 +312,7 @@ func main() {
 				return err
 			}
 
-			task, err := taskGRPC.GetTask(ctx, &taskPB.GetTaskRequest{Id: payload.TaskID})
+			task, err := taskGRPC.GetTask(traceCtx, &taskPB.GetTaskRequest{Id: payload.TaskID})
 			if err != nil {
 				logger.Errorw("Cannot get task from gRPC server", "error", err)
 				return err
@@ -618,7 +642,10 @@ func main() {
 }
 
 func initConfigServerClient(logger *zap.SugaredLogger, clientAddr string) (client configPB.ConfigServiceClient, close func()) {
-	conn, err := grpc.NewClient(clientAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(clientAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	)
 	if err != nil {
 		logger.Fatalf("Failed to connect to gRPC server: %v", err)
 	}
@@ -631,7 +658,10 @@ func initConfigServerClient(logger *zap.SugaredLogger, clientAddr string) (clien
 }
 
 func initTaskServerClient(logger *zap.SugaredLogger, clientAddr string) (client taskPB.TaskServiceClient, close func()) {
-	conn, err := grpc.NewClient(clientAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(clientAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	)
 	if err != nil {
 		logger.Fatalf("Failed to connect to gRPC server: %v", err)
 	}

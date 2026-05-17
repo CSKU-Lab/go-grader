@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	cskuotel "github.com/CSKU-Lab/otel"
 	"github.com/CSKU-Lab/go-grader/configs"
 	"github.com/CSKU-Lab/go-grader/domain/constants/broadcast"
 	"github.com/CSKU-Lab/go-grader/domain/constants/execution"
@@ -20,6 +21,7 @@ import (
 	"github.com/CSKU-Lab/go-grader/internal/logging"
 	"github.com/CSKU-Lab/queue"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -40,6 +42,19 @@ func main() {
 		}
 	}()
 
+	otelShutdown, err := cskuotel.Init(context.Background())
+	if err != nil {
+		logger.Warnw("tracing unavailable", "error", err)
+	} else {
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := otelShutdown(shutdownCtx); err != nil {
+				logger.Warnw("tracer shutdown error", "error", err)
+			}
+		}()
+	}
+
 	env := configs.NewEnv(logger)
 
 	rb, err := queue.NewRabbitMQ(env.GetQueueServerURL())
@@ -53,7 +68,7 @@ func main() {
 		logger.Fatalln("failed to listen: ", err)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	pb.RegisterGraderServiceServer(s, newGraderGRPCServer(logger, rb))
 
 	reflection.Register(s)
@@ -181,6 +196,7 @@ func (s *graderGRPCServer) Run(req *pb.RunRequest, stream grpc.ServerStreamingSe
 	err = s.q.Publish(ctx, "", "run", &queue.Derivery{
 		Body:    message,
 		ReplyTo: qName,
+		Headers: cskuotel.InjectTraceHeaders(ctx),
 	})
 	if err != nil {
 		s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
@@ -287,6 +303,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 				CorrelationID: id.String(),
 				ReplyTo:       qName,
 				Body:          message,
+				Headers:       cskuotel.InjectTraceHeaders(ctx),
 			})
 			if err != nil {
 				s.logger.Errorw("Cannot publish message to the execution queue", "error", err)
