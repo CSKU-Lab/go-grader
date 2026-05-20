@@ -269,6 +269,7 @@ func (s *graderGRPCServer) GenerateTestCases(ctx context.Context, req *pb.Genera
 	var mu sync.Mutex
 
 	var eg errgroup.Group
+	eg.SetLimit(10)
 	for _, testcase := range req.GetTestcases() {
 		eg.Go(func() error {
 			id, err := uuid.NewV7()

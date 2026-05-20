@@ -272,6 +272,16 @@ func main() {
 			result, err := executor.Run(ctx)
 			if err != nil {
 				logger.Errorw("Error from runner", "error", err)
+				errResult, _ := json.Marshal(models.RunResult{
+					ID:     payload.ID,
+					Status: execution.GRADER_ERROR,
+				})
+				if pubErr := q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					Body:          errResult,
+					CorrelationID: payload.ID,
+				}); pubErr != nil {
+					logger.Errorw("Cannot publish grader error result", "error", pubErr)
+				}
 				return err
 			}
 
@@ -378,6 +388,16 @@ func main() {
 			result, err := executor.Grade(ctx)
 			if err != nil {
 				logger.Errorw("Error from runner", "error", err)
+				errResult, _ := json.Marshal(models.RunResult{
+					ID:     payload.ID,
+					Status: execution.GRADER_ERROR,
+				})
+				if pubErr := q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					Body:          errResult,
+					CorrelationID: payload.ID,
+				}); pubErr != nil {
+					logger.Errorw("Cannot publish grader error result", "error", pubErr)
+				}
 				return err
 			}
 
