@@ -150,494 +150,554 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
-		err := q.Consume(ctx, "broadcast", 1, true, func(d *queue.Derivery, exit chan struct{}) error {
-			var action broadcast.Action
+		for {
+			err := q.Consume(ctx, "broadcast", 1, true, func(d *queue.Derivery, exit chan struct{}) error {
+				var action broadcast.Action
 
-			if err := json.Unmarshal(d.Body, &action); err != nil {
-				logger.Errorw("Cannot unmarshal broadcast message", "error", err)
-				return err
+				if err := json.Unmarshal(d.Body, &action); err != nil {
+					logger.Errorw("Cannot unmarshal broadcast message", "error", err)
+					return err
+				}
+
+				switch action {
+				case broadcast.REFETCH_CONFIG:
+					logger.Info("Received broadcast: refetch config")
+
+					runnerRes, err := configGRPC.GetAllRunners(ctx, &configPB.GetAllRunnersRequest{
+						IncludeScripts: true,
+					})
+					if err != nil {
+						logger.Errorw("Failed to refetch runners", "error", err)
+						return err
+					}
+
+					compareRes, err := configGRPC.GetAllCompares(ctx, &configPB.GetAllComparesRequest{
+						IncludeScripts: true,
+						IncludeFiles:   true,
+					})
+					if err != nil {
+						logger.Errorw("Failed to refetch compares", "error", err)
+						return err
+					}
+
+					setup.Cleanup(logger)
+
+					runners := runnerPbToModel(runnerRes.Runners)
+					compares := comparePbToModel(compareRes.Compares)
+
+					setup.Init(logger, runners, compares)
+
+					newRunnerService := services.NewRunnerService(logger)
+					newCompareService := services.NewCompareService(logger)
+
+					newExecutor := services.NewExecutorService(
+						logger,
+						isolateService,
+						newRunnerService,
+						newCompareService,
+					)
+
+					executorHolder.Swap(&newExecutor)
+
+					logger.Info("Config successfully reloaded 🚀")
+				default:
+					logger.Warnw("Unknown broadcast message", "type", action)
+				}
+
+				return nil
+			})
+			if ctx.Err() != nil {
+				return
 			}
+			if err != nil {
+				logger.Errorw("broadcast consumer error, restarting", "error", err)
+			} else {
+				logger.Warn("broadcast consumer exited unexpectedly, restarting")
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+		}
+	})
 
-			switch action {
-			case broadcast.REFETCH_CONFIG:
-				logger.Info("Received broadcast: refetch config")
+	wg.Go(func() {
+		for {
+			err := q.Consume(ctx, "run", env.GetRunQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
+				traceCtx := cskuotel.ExtractTraceContext(derivery.Headers)
+				traceCtx, span := otel.Tracer("go-grader/worker").Start(traceCtx, "worker.run")
+				defer span.End()
 
-				runnerRes, err := configGRPC.GetAllRunners(ctx, &configPB.GetAllRunnersRequest{
-					IncludeScripts: true,
-				})
+				payload := &models.RunExecution{}
+
+				err := json.Unmarshal(derivery.Body, payload)
 				if err != nil {
-					logger.Errorw("Failed to refetch runners", "error", err)
+					logger.Errorw("Cannot unmarshal message", "error", err)
 					return err
 				}
 
-				compareRes, err := configGRPC.GetAllCompares(ctx, &configPB.GetAllComparesRequest{
-					IncludeScripts: true,
-					IncludeFiles:   true,
+				logger.Infow("Received run request", "payload", payload.RunnerID)
+
+				exService := *executorHolder.Get()
+				executor, err := exService.NewExecutor().
+					RunnerID(payload.RunnerID).
+					Files(payload.Files).
+					Input(payload.Input).
+					Limits(payload.Limit).
+					Build()
+
+				if err != nil {
+					bytesResult, err := json.Marshal(models.RunResult{
+						ID:     payload.ID,
+						Status: execution.GRADER_ERROR,
+					})
+					if err != nil {
+						logger.Errorw("Cannot marshal run result", "error", err)
+					}
+
+					err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+						Body:          bytesResult,
+						CorrelationID: payload.ID,
+					})
+					if err != nil {
+						logger.Errorw("Cannot publish run result to the queue", "error", err)
+					}
+					return nil
+				}
+
+				bytesResult, err := json.Marshal(models.RunResult{
+					ID:     payload.ID,
+					Status: execution.RUNNING,
 				})
 				if err != nil {
-					logger.Errorw("Failed to refetch compares", "error", err)
+					logger.Errorw("Cannot marshal run result", "error", err)
+				}
+
+				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					Body:          bytesResult,
+					CorrelationID: payload.ID,
+				})
+				if err != nil {
+					logger.Errorw("Cannot publish run result to the queue", "error", err)
+				}
+
+				result, err := executor.Run(ctx)
+				if err != nil {
+					logger.Errorw("Error from runner", "error", err)
+					errResult, _ := json.Marshal(models.RunResult{
+						ID:     payload.ID,
+						Status: execution.GRADER_ERROR,
+					})
+					if pubErr := q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+						Body:          errResult,
+						CorrelationID: payload.ID,
+					}); pubErr != nil {
+						logger.Errorw("Cannot publish grader error result", "error", pubErr)
+					}
 					return err
 				}
 
-				setup.Cleanup(logger)
+				result.ID = payload.ID
 
-				runners := runnerPbToModel(runnerRes.Runners)
-				compares := comparePbToModel(compareRes.Compares)
+				bytesResult, err = json.Marshal(result)
+				if err != nil {
+					logger.Errorw("Cannot marshal run result", "error", err)
+				}
 
-				setup.Init(logger, runners, compares)
+				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					CorrelationID: payload.ID,
+					Body:          bytesResult,
+				})
+				if err != nil {
+					logger.Errorw("Cannot publish run result to the queue", "error", err)
+				}
 
-				newRunnerService := services.NewRunnerService(logger)
-				newCompareService := services.NewCompareService(logger)
+				logger.Infow("Runner finished", "result", result)
+				return nil
+			})
+			if ctx.Err() != nil {
+				return
+			}
+			if err != nil {
+				logger.Errorw("run consumer error, restarting", "error", err)
+			} else {
+				logger.Warn("run consumer exited unexpectedly, restarting")
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+		}
+	})
 
-				newExecutor := services.NewExecutorService(
-					logger,
-					isolateService,
-					newRunnerService,
-					newCompareService,
+	wg.Go(func() {
+		for {
+			err := q.Consume(ctx, "grade", env.GetGradeQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
+				traceCtx := cskuotel.ExtractTraceContext(derivery.Headers)
+				traceCtx, span := otel.Tracer("go-grader/worker").Start(traceCtx, "worker.grade")
+				defer span.End()
+
+				payload := &models.GradeExecution{}
+
+				err := json.Unmarshal(derivery.Body, payload)
+				if err != nil {
+					logger.Errorw("Cannot unmarshal message", "error", err)
+					return err
+				}
+
+				task, err := taskGRPC.GetTask(traceCtx, &taskPB.GetTaskRequest{Id: payload.TaskID})
+				if err != nil {
+					logger.Errorw("Cannot get task from gRPC server", "error", err)
+					return err
+				}
+
+				var limit *models.Limit
+				if task.Limit != nil {
+					limit = &models.Limit{
+						CPUTime:      task.Limit.CpuTime,
+						CPUExtraTime: task.Limit.CpuExtraTime,
+						Memory:       task.Limit.Memory,
+						WallTime:     task.Limit.WallTime,
+						Stack:        task.Limit.Stack,
+						MaxOpenFiles: task.Limit.MaxOpenFiles,
+						MaxFileSize:  task.Limit.MaxFileSize,
+						NetworkAllow: task.Limit.NetworkAllow,
+					}
+				}
+
+				exService := *executorHolder.Get()
+				executor, err := exService.NewExecutor().
+					RunnerID(payload.RunnerID).
+					Files(payload.Files).
+					TestCaseGroups(testcaseGroupsPbToModel(task.GetTestCaseGroups())).
+					Limits(limit).
+					CompareID(task.GetCompareScriptId()).
+					Build()
+				if err != nil {
+					bytesResult, err := json.Marshal(models.RunResult{
+						ID:     payload.ID,
+						Status: execution.GRADER_ERROR,
+					})
+					if err != nil {
+						logger.Errorw("Cannot marshal run result", "error", err)
+					}
+
+					err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+						Body:          bytesResult,
+						CorrelationID: payload.ID,
+					})
+					if err != nil {
+						logger.Errorw("Cannot publish run result to the queue", "error", err)
+					}
+					return nil
+				}
+
+				bytesResult, err := json.Marshal(models.RunResult{
+					ID:     payload.ID,
+					Status: execution.RUNNING,
+				})
+				if err != nil {
+					logger.Errorw("Cannot marshal run result", "error", err)
+				}
+
+				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					Body:          bytesResult,
+					CorrelationID: payload.ID,
+				})
+				if err != nil {
+					logger.Errorw("Cannot publish run result to the queue", "error", err)
+				}
+
+				result, err := executor.Grade(ctx)
+				if err != nil {
+					logger.Errorw("Error from runner", "error", err)
+					errResult, _ := json.Marshal(models.RunResult{
+						ID:     payload.ID,
+						Status: execution.GRADER_ERROR,
+					})
+					if pubErr := q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+						Body:          errResult,
+						CorrelationID: payload.ID,
+					}); pubErr != nil {
+						logger.Errorw("Cannot publish grader error result", "error", pubErr)
+					}
+					return err
+				}
+
+				bytesResult, err = json.Marshal(result)
+				if err != nil {
+					logger.Errorw("Cannot marshal run result", "error", err)
+				}
+
+				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+					CorrelationID: payload.ID,
+					Body:          bytesResult,
+				})
+				if err != nil {
+					logger.Errorw("Cannot publish run result to the queue", "error", err)
+				}
+
+				logger.Info("Runner finished")
+				return nil
+			})
+			if ctx.Err() != nil {
+				return
+			}
+			if err != nil {
+				logger.Errorw("grade consumer error, restarting", "error", err)
+			} else {
+				logger.Warn("grade consumer exited unexpectedly, restarting")
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+		}
+	})
+
+	wg.Go(func() {
+		for {
+			err := q.Consume(ctx, "runner_test", 1, true, func(derivery *queue.Derivery, exit chan struct{}) error {
+				result := models.RunResult{
+					ID: derivery.CorrelationID,
+				}
+
+				publish := func() error {
+					resultBytes, err := json.Marshal(result)
+					if err != nil {
+						return err
+					}
+					return q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+						CorrelationID: derivery.CorrelationID,
+						Body:          []byte(resultBytes),
+					})
+				}
+
+				payload := &models.RunnerTestExecution{}
+				err := json.Unmarshal(derivery.Body, payload)
+				if err != nil {
+					return err
+				}
+
+				instance := isolateService.NewRunInstance()
+				instance.Init(ctx)
+				defer instance.Cleanup()
+
+				result.Status = execution.RUNNING
+				if err = publish(); err != nil {
+					return err
+				}
+
+				for _, file := range payload.InitialFiles {
+					err = instance.CreateFile(file.Name, file.Content, 0600)
+					if err != nil {
+						result.Status = execution.GRADER_ERROR
+						result.Output = err.Error()
+						if err = publish(); err != nil {
+							return err
+						}
+					}
+				}
+
+				if payload.BuildScript != "" {
+					err = instance.CreateFile("build_script.sh", payload.BuildScript, 0700)
+					if err != nil {
+						result.Status = execution.GRADER_ERROR
+						result.Output = err.Error()
+						if err = publish(); err != nil {
+							return err
+						}
+					}
+
+					output, err := instance.Compile(ctx)
+					if err != nil {
+						result.Status = execution.COMPILE_FAILED
+						result.Output = output
+						if err = publish(); err != nil {
+							return err
+						}
+					}
+				}
+
+				err = instance.CreateFile("run_script.sh", payload.RunScript, 0700)
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
+					if err = publish(); err != nil {
+						return err
+					}
+				}
+
+				output, err := instance.Run(ctx, "run_script.sh", payload.Input, nil)
+				if err != nil {
+					result.Status = execution.RUNTIME_ERROR
+					result.Output = output
+					if err = publish(); err != nil {
+						return err
+					}
+				}
+
+				metadata, err := instance.GetMetadata()
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
+					if err = publish(); err != nil {
+						return err
+					}
+				}
+
+				result.Output = output
+				result.Status = execution.RUN_PASSED
+				result.WallTime = metadata.WallTime
+				result.Memory = metadata.Memory
+
+				return publish()
+			})
+			if ctx.Err() != nil {
+				return
+			}
+			if err != nil {
+				logger.Errorw("runner_test consumer error, restarting", "error", err)
+			} else {
+				logger.Warn("runner_test consumer exited unexpectedly, restarting")
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+		}
+	})
+
+	wg.Go(func() {
+		for {
+			err := q.Consume(ctx, "compare_test", 1, true, func(derivery *queue.Derivery, exit chan struct{}) error {
+				result := models.RunResult{
+					ID: derivery.CorrelationID,
+				}
+
+				publish := func() error {
+					resultBytes, err := json.Marshal(result)
+					if err != nil {
+						return err
+					}
+					return q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
+						CorrelationID: derivery.CorrelationID,
+						Body:          resultBytes,
+					})
+				}
+
+				payload := &models.CompareTestExecution{}
+				err := json.Unmarshal(derivery.Body, payload)
+				if err != nil {
+					return err
+				}
+
+				if payload.RunName == "" {
+					result.Status = execution.GRADER_ERROR
+					result.Output = "run_name is required: set a Run Name in the compare script settings"
+					return publish()
+				}
+
+				if payload.RunScript == "" {
+					result.Status = execution.GRADER_ERROR
+					result.Output = "run_script.sh content is required"
+					return publish()
+				}
+
+				instance := isolateService.NewRunInstance()
+				instance.Init(ctx)
+				defer instance.Cleanup()
+
+				result.Status = execution.RUNNING
+				if err = publish(); err != nil {
+					return err
+				}
+
+				for _, file := range payload.Files {
+					err = instance.CreateFile(file.Name, file.Content, 0644)
+					if err != nil {
+						result.Status = execution.GRADER_ERROR
+						result.Output = err.Error()
+						return publish()
+					}
+				}
+
+				err = instance.CreateFile("sol_output", payload.SolOutput, 0644)
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
+					return publish()
+				}
+
+				err = instance.CreateFile("output", payload.Output, 0644)
+				if err != nil {
+					result.Status = execution.GRADER_ERROR
+					result.Output = err.Error()
+					return publish()
+				}
+
+				if payload.BuildScript != "" {
+					err = instance.CreateFile("build_script.sh", payload.BuildScript, 0700)
+					if err != nil {
+						result.Status = execution.GRADER_ERROR
+						result.Output = err.Error()
+						return publish()
+					}
+
+					output, err := instance.Compile(ctx)
+					if err != nil {
+						result.Status = execution.COMPILE_FAILED
+						result.Output = output
+						return publish()
+					}
+				}
+
+				preamble := fmt.Sprintf(
+					"#!/bin/bash\n"+
+						"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"+
+						"export RUN_NAME=/box/%s\n"+
+						"export OUTPUT=/box/output\n"+
+						"export SOL_OUTPUT=/box/sol_output\n",
+					payload.RunName,
 				)
-
-				executorHolder.Swap(&newExecutor)
-
-				logger.Info("Config successfully reloaded 🚀")
-			default:
-				logger.Warnw("Unknown broadcast message", "type", action)
-			}
-
-			return nil
-		})
-		if err != nil {
-			logger.Errorw("broadcast consumer error", "error", err)
-		}
-	})
-
-	wg.Go(func() {
-		err := q.Consume(ctx, "run", env.GetRunQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
-			traceCtx := cskuotel.ExtractTraceContext(derivery.Headers)
-			traceCtx, span := otel.Tracer("go-grader/worker").Start(traceCtx, "worker.run")
-			defer span.End()
-
-			payload := &models.RunExecution{}
-
-			err := json.Unmarshal(derivery.Body, payload)
-			if err != nil {
-				logger.Errorw("Cannot unmarshal message", "error", err)
-				return err
-			}
-
-			logger.Infow("Received run request", "payload", payload.RunnerID)
-
-			exService := *executorHolder.Get()
-			executor, err := exService.NewExecutor().
-				RunnerID(payload.RunnerID).
-				Files(payload.Files).
-				Input(payload.Input).
-				Limits(payload.Limit).
-				Build()
-
-			if err != nil {
-				bytesResult, err := json.Marshal(models.RunResult{
-					ID:     payload.ID,
-					Status: execution.GRADER_ERROR,
-				})
-				if err != nil {
-					logger.Errorw("Cannot marshal run result", "error", err)
-				}
-
-				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-					Body:          bytesResult,
-					CorrelationID: payload.ID,
-				})
-				if err != nil {
-					logger.Errorw("Cannot publish run result to the queue", "error", err)
-				}
-				return nil
-			}
-
-			bytesResult, err := json.Marshal(models.RunResult{
-				ID:     payload.ID,
-				Status: execution.RUNNING,
-			})
-			if err != nil {
-				logger.Errorw("Cannot marshal run result", "error", err)
-			}
-
-			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-				Body:          bytesResult,
-				CorrelationID: payload.ID,
-			})
-			if err != nil {
-				logger.Errorw("Cannot publish run result to the queue", "error", err)
-			}
-
-			result, err := executor.Run(ctx)
-			if err != nil {
-				logger.Errorw("Error from runner", "error", err)
-				errResult, _ := json.Marshal(models.RunResult{
-					ID:     payload.ID,
-					Status: execution.GRADER_ERROR,
-				})
-				if pubErr := q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-					Body:          errResult,
-					CorrelationID: payload.ID,
-				}); pubErr != nil {
-					logger.Errorw("Cannot publish grader error result", "error", pubErr)
-				}
-				return err
-			}
-
-			result.ID = payload.ID
-
-			bytesResult, err = json.Marshal(result)
-			if err != nil {
-				logger.Errorw("Cannot marshal run result", "error", err)
-			}
-
-			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-				CorrelationID: payload.ID,
-				Body:          bytesResult,
-			})
-			if err != nil {
-				logger.Errorw("Cannot publish run result to the queue", "error", err)
-			}
-
-			logger.Infow("Runner finished", "result", result)
-			return nil
-		})
-		if err != nil {
-			logger.Errorw("error", err)
-		}
-	})
-
-	wg.Go(func() {
-		err := q.Consume(ctx, "grade", env.GetGradeQueueAmount(), true, func(derivery *queue.Derivery, exit chan struct{}) error {
-			traceCtx := cskuotel.ExtractTraceContext(derivery.Headers)
-			traceCtx, span := otel.Tracer("go-grader/worker").Start(traceCtx, "worker.grade")
-			defer span.End()
-
-			payload := &models.GradeExecution{}
-
-			err := json.Unmarshal(derivery.Body, payload)
-			if err != nil {
-				logger.Errorw("Cannot unmarshal message", "error", err)
-				return err
-			}
-
-			task, err := taskGRPC.GetTask(traceCtx, &taskPB.GetTaskRequest{Id: payload.TaskID})
-			if err != nil {
-				logger.Errorw("Cannot get task from gRPC server", "error", err)
-				return err
-			}
-
-			var limit *models.Limit
-			if task.Limit != nil {
-				limit = &models.Limit{
-					CPUTime:      task.Limit.CpuTime,
-					CPUExtraTime: task.Limit.CpuExtraTime,
-					Memory:       task.Limit.Memory,
-					WallTime:     task.Limit.WallTime,
-					Stack:        task.Limit.Stack,
-					MaxOpenFiles: task.Limit.MaxOpenFiles,
-					MaxFileSize:  task.Limit.MaxFileSize,
-					NetworkAllow: task.Limit.NetworkAllow,
-				}
-			}
-
-			exService := *executorHolder.Get()
-			executor, err := exService.NewExecutor().
-				RunnerID(payload.RunnerID).
-				Files(payload.Files).
-				TestCaseGroups(testcaseGroupsPbToModel(task.GetTestCaseGroups())).
-				Limits(limit).
-				CompareID(task.GetCompareScriptId()).
-				Build()
-			if err != nil {
-				bytesResult, err := json.Marshal(models.RunResult{
-					ID:     payload.ID,
-					Status: execution.GRADER_ERROR,
-				})
-				if err != nil {
-					logger.Errorw("Cannot marshal run result", "error", err)
-				}
-
-				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-					Body:          bytesResult,
-					CorrelationID: payload.ID,
-				})
-				if err != nil {
-					logger.Errorw("Cannot publish run result to the queue", "error", err)
-				}
-				return nil
-			}
-
-			bytesResult, err := json.Marshal(models.RunResult{
-				ID:     payload.ID,
-				Status: execution.RUNNING,
-			})
-			if err != nil {
-				logger.Errorw("Cannot marshal run result", "error", err)
-			}
-
-			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-				Body:          bytesResult,
-				CorrelationID: payload.ID,
-			})
-			if err != nil {
-				logger.Errorw("Cannot publish run result to the queue", "error", err)
-			}
-
-			result, err := executor.Grade(ctx)
-			if err != nil {
-				logger.Errorw("Error from runner", "error", err)
-				errResult, _ := json.Marshal(models.RunResult{
-					ID:     payload.ID,
-					Status: execution.GRADER_ERROR,
-				})
-				if pubErr := q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-					Body:          errResult,
-					CorrelationID: payload.ID,
-				}); pubErr != nil {
-					logger.Errorw("Cannot publish grader error result", "error", pubErr)
-				}
-				return err
-			}
-
-			bytesResult, err = json.Marshal(result)
-			if err != nil {
-				logger.Errorw("Cannot marshal run result", "error", err)
-			}
-
-			err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-				CorrelationID: payload.ID,
-				Body:          bytesResult,
-			})
-			if err != nil {
-				logger.Errorw("Cannot publish run result to the queue", "error", err)
-			}
-
-			logger.Info("Runner finished")
-			return nil
-		})
-		if err != nil {
-			logger.Errorw("error", err)
-		}
-	})
-
-	wg.Go(func() {
-		err := q.Consume(ctx, "runner_test", 1, true, func(derivery *queue.Derivery, exit chan struct{}) error {
-			result := models.RunResult{
-				ID: derivery.CorrelationID,
-			}
-
-			publish := func() error {
-				resultBytes, err := json.Marshal(result)
-				if err != nil {
-					return err
-				}
-				return q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-					CorrelationID: derivery.CorrelationID,
-					Body:          []byte(resultBytes),
-				})
-			}
-
-			payload := &models.RunnerTestExecution{}
-			err := json.Unmarshal(derivery.Body, payload)
-			if err != nil {
-				return err
-			}
-
-			instance := isolateService.NewRunInstance()
-			instance.Init(ctx)
-			defer instance.Cleanup()
-
-			result.Status = execution.RUNNING
-			if err = publish(); err != nil {
-				return err
-			}
-
-			for _, file := range payload.InitialFiles {
-				err = instance.CreateFile(file.Name, file.Content, 0600)
-				if err != nil {
-					result.Status = execution.GRADER_ERROR
-					result.Output = err.Error()
-					if err = publish(); err != nil {
-						return err
-					}
-				}
-			}
-
-			if payload.BuildScript != "" {
-				err = instance.CreateFile("build_script.sh", payload.BuildScript, 0700)
-				if err != nil {
-					result.Status = execution.GRADER_ERROR
-					result.Output = err.Error()
-					if err = publish(); err != nil {
-						return err
-					}
-				}
-
-				output, err := instance.Compile(ctx)
-				if err != nil {
-					result.Status = execution.COMPILE_FAILED
-					result.Output = output
-					if err = publish(); err != nil {
-						return err
-					}
-				}
-			}
-
-			err = instance.CreateFile("run_script.sh", payload.RunScript, 0700)
-			if err != nil {
-				result.Status = execution.GRADER_ERROR
-				result.Output = err.Error()
-				if err = publish(); err != nil {
-					return err
-				}
-			}
-
-			output, err := instance.Run(ctx, "run_script.sh", payload.Input, nil)
-			if err != nil {
-				result.Status = execution.RUNTIME_ERROR
-				result.Output = output
-				if err = publish(); err != nil {
-					return err
-				}
-			}
-
-			metadata, err := instance.GetMetadata()
-			if err != nil {
-				result.Status = execution.GRADER_ERROR
-				result.Output = err.Error()
-				if err = publish(); err != nil {
-					return err
-				}
-			}
-
-			result.Output = output
-			result.Status = execution.RUN_PASSED
-			result.WallTime = metadata.WallTime
-			result.Memory = metadata.Memory
-
-			return publish()
-		})
-		if err != nil {
-			logger.Errorw("runner_test consumer error", "error", err)
-		}
-	})
-
-	wg.Go(func() {
-		err := q.Consume(ctx, "compare_test", 1, true, func(derivery *queue.Derivery, exit chan struct{}) error {
-			result := models.RunResult{
-				ID: derivery.CorrelationID,
-			}
-
-			publish := func() error {
-				resultBytes, err := json.Marshal(result)
-				if err != nil {
-					return err
-				}
-				return q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
-					CorrelationID: derivery.CorrelationID,
-					Body:          resultBytes,
-				})
-			}
-
-			payload := &models.CompareTestExecution{}
-			err := json.Unmarshal(derivery.Body, payload)
-			if err != nil {
-				return err
-			}
-
-			if payload.RunName == "" {
-				result.Status = execution.GRADER_ERROR
-				result.Output = "run_name is required: set a Run Name in the compare script settings"
-				return publish()
-			}
-
-			if payload.RunScript == "" {
-				result.Status = execution.GRADER_ERROR
-				result.Output = "run_script.sh content is required"
-				return publish()
-			}
-
-			instance := isolateService.NewRunInstance()
-			instance.Init(ctx)
-			defer instance.Cleanup()
-
-			result.Status = execution.RUNNING
-			if err = publish(); err != nil {
-				return err
-			}
-
-			for _, file := range payload.Files {
-				err = instance.CreateFile(file.Name, file.Content, 0644)
-				if err != nil {
-					result.Status = execution.GRADER_ERROR
-					result.Output = err.Error()
-					return publish()
-				}
-			}
-
-			err = instance.CreateFile("sol_output", payload.SolOutput, 0644)
-			if err != nil {
-				result.Status = execution.GRADER_ERROR
-				result.Output = err.Error()
-				return publish()
-			}
-
-			err = instance.CreateFile("output", payload.Output, 0644)
-			if err != nil {
-				result.Status = execution.GRADER_ERROR
-				result.Output = err.Error()
-				return publish()
-			}
-
-			if payload.BuildScript != "" {
-				err = instance.CreateFile("build_script.sh", payload.BuildScript, 0700)
+				err = instance.CreateFile("run_script.sh", preamble+payload.RunScript, 0700)
 				if err != nil {
 					result.Status = execution.GRADER_ERROR
 					result.Output = err.Error()
 					return publish()
 				}
 
-				output, err := instance.Compile(ctx)
+				output, exitCode, err := instance.RunCompare(ctx)
+				result.ExitCode = exitCode
 				if err != nil {
-					result.Status = execution.COMPILE_FAILED
+					result.Status = execution.RUNTIME_ERROR
 					result.Output = output
 					return publish()
 				}
-			}
 
-			preamble := fmt.Sprintf(
-				"#!/bin/bash\n"+
-					"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"+
-					"export RUN_NAME=/box/%s\n"+
-					"export OUTPUT=/box/output\n"+
-					"export SOL_OUTPUT=/box/sol_output\n",
-				payload.RunName,
-			)
-			err = instance.CreateFile("run_script.sh", preamble+payload.RunScript, 0700)
-			if err != nil {
-				result.Status = execution.GRADER_ERROR
-				result.Output = err.Error()
-				return publish()
-			}
-
-			output, exitCode, err := instance.RunCompare(ctx)
-			result.ExitCode = exitCode
-			if err != nil {
-				result.Status = execution.RUNTIME_ERROR
+				compareResult, _ := instance.GetCompareResult()
 				result.Output = output
+				result.CompareResult = compareResult
+				result.Status = execution.RUN_PASSED
 				return publish()
+			})
+			if ctx.Err() != nil {
+				return
 			}
-
-			compareResult, _ := instance.GetCompareResult()
-			result.Output = output
-			result.CompareResult = compareResult
-			result.Status = execution.RUN_PASSED
-			return publish()
-		})
-		if err != nil {
-			logger.Errorw("compare_test consumer error", "error", err)
+			if err != nil {
+				logger.Errorw("compare_test consumer error, restarting", "error", err)
+			} else {
+				logger.Warn("compare_test consumer exited unexpectedly, restarting")
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
 		}
 	})
 
