@@ -1,3 +1,10 @@
+## [0.3.3](https://github.com/CSKU-Lab/go-grader/compare/v0.3.2...v0.3.3) (2026-05-30)
+
+
+### Bug Fixes
+
+* restart consumers on RabbitMQ connection drop ([7e7a231](https://github.com/CSKU-Lab/go-grader/commit/7e7a231d11a59aa9bfd0458839cb48ad268af13a))
+
 ## [0.3.2](https://github.com/CSKU-Lab/go-grader/compare/v0.3.1...v0.3.2) (2026-05-23)
 
 
