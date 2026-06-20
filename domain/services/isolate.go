@@ -116,6 +116,8 @@ func (i *IsolateInstance) executeWithInput(ctx context.Context, input string, ar
 
 func (i *IsolateInstance) Init(ctx context.Context) {
 	i.log("Initializing sandbox...")
+	// cleanup any leftover state from a previous crashed run before init
+	i.execute(ctx, "--cleanup")
 	_, err := i.execute(ctx, "--init")
 	if err != nil {
 		i.logFatalf("Error on init: %s", err)
