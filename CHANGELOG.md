@@ -1,3 +1,10 @@
+## [0.3.5](https://github.com/CSKU-Lab/go-grader/compare/v0.3.4...v0.3.5) (2026-06-20)
+
+
+### Bug Fixes
+
+* guard against divide by zero when totalTestCases is 0 ([4445b1e](https://github.com/CSKU-Lab/go-grader/commit/4445b1ed532752d21f0596ea8d23bd40c1da85a0))
+
 ## [0.3.4](https://github.com/CSKU-Lab/go-grader/compare/v0.3.3...v0.3.4) (2026-06-20)
 
 
