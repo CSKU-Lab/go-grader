@@ -367,13 +367,18 @@ func main() {
 					}
 				}
 
+				compareScriptID := task.GetCompareScriptId()
+				if compareScriptID == "" {
+					compareScriptID = payload.CompareScriptID
+				}
+
 				exService := *executorHolder.Get()
 				executor, err := exService.NewExecutor().
 					RunnerID(payload.RunnerID).
 					Files(payload.Files).
 					TestCaseGroups(testcaseGroupsPbToModel(task.GetTestCaseGroups())).
 					Limits(limit).
-					CompareID(task.GetCompareScriptId()).
+					CompareID(compareScriptID).
 					Build()
 				if err != nil {
 					bytesResult, err := json.Marshal(models.RunResult{
