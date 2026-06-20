@@ -1,0 +1,38 @@
+name: Update Base Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_image_tag:
+        description: 'isolate-with-compilers image tag (e.g. v1.2.3)'
+        required: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: CSKU-Lab
+          repositories: go-grader
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Update base image tag in Dockerfiles
+        run: |
+          sed -i "s|FROM cskulab/isolate-with-compilers.*|FROM cskulab/isolate-with-compilers:${{ inputs.base_image_tag }}|g" \
+            docker/worker/Dockerfile \
+            docker/worker/Dockerfile.dev \
+            docker/isolate-test/Dockerfile
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docker/worker/Dockerfile docker/worker/Dockerfile.dev docker/isolate-test/Dockerfile
+          git diff --cached --quiet || git commit -m "fix: update isolate-with-compilers base image to ${{ inputs.base_image_tag }}"
+          git push
