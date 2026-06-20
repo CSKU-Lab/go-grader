@@ -248,11 +248,18 @@ func (r *executor) Grade(ctx context.Context) (*models.GradeResult, error) {
 		return nil, err
 	}
 
+	var avgWallTime float32
+	var avgMemory int32
+	if totalTestCases > 0 {
+		avgWallTime = totalWallTime / float32(totalTestCases)
+		avgMemory = totalMemory / totalTestCases
+	}
+
 	return &models.GradeResult{
 		Status:               status,
 		TestCaseGroupResults: testCaseGroupResults,
-		AvgWallTime:          totalWallTime / float32(totalTestCases),
-		AvgMemory:            totalMemory / totalTestCases,
+		AvgWallTime:          avgWallTime,
+		AvgMemory:            avgMemory,
 		Score:                totalScore,
 	}, nil
 }
