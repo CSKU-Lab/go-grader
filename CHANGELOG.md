@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/CSKU-Lab/go-grader/compare/v0.3.5...v0.4.0) (2026-06-20)
+
+
+### Features
+
+* add workflow to auto-update isolate-with-compilers base image tag ([061e95b](https://github.com/CSKU-Lab/go-grader/commit/061e95b1279d480df2c2d733aaf921cee2e57dea))
+
 ## [0.3.5](https://github.com/CSKU-Lab/go-grader/compare/v0.3.4...v0.3.5) (2026-06-20)
 
 
