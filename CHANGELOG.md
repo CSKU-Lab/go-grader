@@ -1,3 +1,10 @@
+## [0.3.4](https://github.com/CSKU-Lab/go-grader/compare/v0.3.3...v0.3.4) (2026-06-20)
+
+
+### Bug Fixes
+
+* cleanup isolate box before init to handle crashed previous runs ([0945903](https://github.com/CSKU-Lab/go-grader/commit/0945903acaf2eea9fe29263d199b7a5e08cd468b))
+
 ## [0.3.3](https://github.com/CSKU-Lab/go-grader/compare/v0.3.2...v0.3.3) (2026-05-30)
 
 
