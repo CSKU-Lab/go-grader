@@ -1,3 +1,15 @@
+# [0.5.0](https://github.com/CSKU-Lab/go-grader/compare/v0.4.0...v0.5.0) (2026-06-21)
+
+
+### Bug Fixes
+
+* **CS-209:** fix broadcast queue not reaching all workers ([7e7e2ec](https://github.com/CSKU-Lab/go-grader/commit/7e7e2eca0f3c0541fb4a540136af9d3c2c5f093d))
+
+
+### Features
+
+* **CS-197:** fall back to payload CompareScriptID when task has no compare script ([544c74a](https://github.com/CSKU-Lab/go-grader/commit/544c74a1197cc5d9833a277cbf8c643238820406))
+
 # [0.4.0](https://github.com/CSKU-Lab/go-grader/compare/v0.3.5...v0.4.0) (2026-06-20)
 
 
