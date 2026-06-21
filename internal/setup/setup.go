@@ -25,6 +25,7 @@ func Init(logger *zap.SugaredLogger, runners []models.RunnerConfig, compares []m
 	go setupCompares(logger, &wg, compares)
 	wg.Wait()
 
+	writeToComparesJson(compares)
 	logger.Info("Setup completed. :D")
 }
 
@@ -212,7 +213,6 @@ func setupCompares(logger *zap.SugaredLogger, wg *sync.WaitGroup, compares []mod
 		})
 	}
 
-	writeToComparesJson(compares)
 }
 
 func writeToComparesJson(compares []models.CompareConfig) error {
@@ -221,10 +221,14 @@ func writeToComparesJson(compares []models.CompareConfig) error {
 		if compare.RunName == "" || len(compare.Files) == 0 {
 			continue
 		}
+		comparePath := path.Join(constants.COMPARE_DIR, compare.ID)
+		if exists, _ := isDirExists(comparePath); !exists {
+			continue
+		}
 		localCompares = append(localCompares, models.LocalCompare{
 			ID:      compare.ID,
 			RunName: compare.RunName,
-			Path:    path.Join(constants.COMPARE_DIR, compare.ID),
+			Path:    comparePath,
 		})
 	}
 

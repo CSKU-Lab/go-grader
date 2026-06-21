@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/CSKU-Lab/otel v0.1.1
-	github.com/CSKU-Lab/queue v0.3.1
+	github.com/CSKU-Lab/queue v0.3.4
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/stretchr/testify v1.10.0

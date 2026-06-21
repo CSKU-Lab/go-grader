@@ -63,6 +63,10 @@ func main() {
 	}
 	defer rb.Close()
 
+	if err := rb.DeclareExchange(context.Background(), "broadcast", "fanout", true); err != nil {
+		logger.Fatalw("Cannot declare broadcast fanout exchange", "error", err)
+	}
+
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", env.GetPort()))
 	if err != nil {
 		logger.Fatalln("failed to listen: ", err)
@@ -127,7 +131,7 @@ func (s *graderGRPCServer) Broadcast(ctx context.Context, req *pb.BroadcastReque
 		return nil, status.Error(codes.Internal, "failed to marshal broadcast message")
 	}
 
-	err = s.q.Publish(ctx, "", "broadcast", &queue.Derivery{
+	err = s.q.Publish(ctx, "broadcast", "", &queue.Derivery{
 		Body: body,
 	})
 	if err != nil {
