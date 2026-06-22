@@ -1,3 +1,10 @@
+# [0.6.0](https://github.com/CSKU-Lab/go-grader/compare/v0.5.0...v0.6.0) (2026-06-22)
+
+
+### Features
+
+* **CS-211:** regenerate genproto with Segment message in File ([8897d1e](https://github.com/CSKU-Lab/go-grader/commit/8897d1e7390b8c98ff08a1b74c0016eb7cbfc3ec))
+
 # [0.5.0](https://github.com/CSKU-Lab/go-grader/compare/v0.4.0...v0.5.0) (2026-06-21)
 
 
