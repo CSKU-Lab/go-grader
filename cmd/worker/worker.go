@@ -25,7 +25,9 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -296,7 +298,7 @@ func main() {
 					}); pubErr != nil {
 						logger.Errorw("Cannot publish grader error result", "error", pubErr)
 					}
-					return err
+					return nil
 				}
 
 				result.ID = payload.ID
@@ -351,6 +353,9 @@ func main() {
 				task, err := taskGRPC.GetTask(traceCtx, &taskPB.GetTaskRequest{Id: payload.TaskID})
 				if err != nil {
 					logger.Errorw("Cannot get task from gRPC server", "error", err)
+					if status.Code(err) == codes.NotFound {
+						return nil
+					}
 					return err
 				}
 
@@ -431,7 +436,7 @@ func main() {
 					}); pubErr != nil {
 						logger.Errorw("Cannot publish grader error result", "error", pubErr)
 					}
-					return err
+					return nil
 				}
 
 				bytesResult, err = json.Marshal(result)
