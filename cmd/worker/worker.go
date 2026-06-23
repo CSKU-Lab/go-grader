@@ -354,9 +354,9 @@ func main() {
 					return err
 				}
 
-				var limit *models.Limit
+				rawLimit := models.Limit{}
 				if task.Limit != nil {
-					limit = &models.Limit{
+					rawLimit = models.Limit{
 						CPUTime:      task.Limit.CpuTime,
 						CPUExtraTime: task.Limit.CpuExtraTime,
 						Memory:       task.Limit.Memory,
@@ -367,6 +367,8 @@ func main() {
 						NetworkAllow: task.Limit.NetworkAllow,
 					}
 				}
+				safeLimit := rawLimit.WithSafeLimits()
+				limit := &safeLimit
 
 				compareScriptID := task.GetCompareScriptId()
 				if compareScriptID == "" {

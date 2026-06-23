@@ -21,3 +21,41 @@ type Limit struct {
 	MaxFileSize  float32 `json:"maxFileSize" arg:"--fsize"`
 	NetworkAllow bool    `json:"allowNetwork" arg:"--share-net"`
 }
+
+// System maximum safe limits applied when a field is zero or negative.
+const (
+	SafeCPUTime      float32 = 10
+	SafeCPUExtraTime float32 = 3
+	SafeWallTime     float32 = 15
+	SafeMemory       int32   = 524288
+	SafeStack        int32   = 262144
+	SafeMaxOpenFiles int32   = 10
+	SafeMaxFileSize  float32 = 5120
+)
+
+// WithSafeLimits returns a copy of l with any field that is ≤ 0 replaced by
+// the system maximum safe limit, ensuring isolate never runs unbounded.
+func (l Limit) WithSafeLimits() Limit {
+	if l.CPUTime <= 0 {
+		l.CPUTime = SafeCPUTime
+	}
+	if l.CPUExtraTime <= 0 {
+		l.CPUExtraTime = SafeCPUExtraTime
+	}
+	if l.WallTime <= 0 {
+		l.WallTime = SafeWallTime
+	}
+	if l.Memory <= 0 {
+		l.Memory = SafeMemory
+	}
+	if l.Stack <= 0 {
+		l.Stack = SafeStack
+	}
+	if l.MaxOpenFiles <= 0 {
+		l.MaxOpenFiles = SafeMaxOpenFiles
+	}
+	if l.MaxFileSize <= 0 {
+		l.MaxFileSize = SafeMaxFileSize
+	}
+	return l
+}
