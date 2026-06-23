@@ -1,3 +1,15 @@
+# [0.7.0](https://github.com/CSKU-Lab/go-grader/compare/v0.6.0...v0.7.0) (2026-06-23)
+
+
+### Bug Fixes
+
+* **CS-107:** drop messages instead of requeuing on unrecoverable handler errors ([e1e5d03](https://github.com/CSKU-Lab/go-grader/commit/e1e5d0385d4f01ad7c7c6b898520db8d961f511e))
+
+
+### Features
+
+* **CS-217:** enforce system maximum safe limits when limit fields are zero or negative ([3e7302b](https://github.com/CSKU-Lab/go-grader/commit/3e7302bef798d2c831ee97df5042d3bdf6c33347))
+
 # [0.6.0](https://github.com/CSKU-Lab/go-grader/compare/v0.5.0...v0.6.0) (2026-06-22)
 
 
