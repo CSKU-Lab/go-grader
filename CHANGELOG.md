@@ -1,3 +1,10 @@
+## [0.7.1](https://github.com/CSKU-Lab/go-grader/compare/v0.7.0...v0.7.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* isolate max file size bug ([1a4da97](https://github.com/CSKU-Lab/go-grader/commit/1a4da9731379117cf82d0d5028dd16ff821e93e6))
+
 # [0.7.0](https://github.com/CSKU-Lab/go-grader/compare/v0.6.0...v0.7.0) (2026-06-23)
 
 
