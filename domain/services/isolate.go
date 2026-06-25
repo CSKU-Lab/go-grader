@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/CSKU-Lab/go-grader/domain/constants"
@@ -411,21 +412,26 @@ func getLimitArgs(limit *models.Limit) []string {
 		arg := t.Field(i).Tag.Get("arg")
 
 		switch field.Kind() {
-		case reflect.Int:
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			if field.Int() == 0 {
 				continue
 			}
 			args = append(args, fmt.Sprintf("%s=%d", arg, field.Int()))
-		case reflect.Float32:
-			if field.Float() == 0 {
+		case reflect.Float32, reflect.Float64:
+			f := field.Float()
+			if f == 0 {
 				continue
 			}
-			args = append(args, fmt.Sprintf("%s=%f", arg, field.Float()))
+			// isolate parses size options (e.g. --fsize) as integers and time
+			// options as integer-or-fractional. FormatFloat with -1 precision
+			// keeps whole numbers integral ("5120", not "5120.000000") and never
+			// emits exponent form ("1e+06"), both of which isolate rejects.
+			args = append(args, fmt.Sprintf("%s=%s", arg, strconv.FormatFloat(f, 'f', -1, 64)))
 		case reflect.Bool:
 			if !field.Bool() {
 				continue
 			}
-			args = append(args, fmt.Sprintf("%s", arg))
+			args = append(args, arg)
 		}
 	}
 
