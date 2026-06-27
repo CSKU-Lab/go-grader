@@ -28,6 +28,7 @@ type RunnerPaginationData struct {
 	BuildScript   string                 `protobuf:"bytes,3,opt,name=build_script,json=buildScript,proto3" json:"build_script,omitempty"`
 	RunScript     string                 `protobuf:"bytes,4,opt,name=run_script,json=runScript,proto3" json:"run_script,omitempty"`
 	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	InitialFiles  []*File                `protobuf:"bytes,6,rep,name=initial_files,json=initialFiles,proto3" json:"initial_files,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -95,6 +96,13 @@ func (x *RunnerPaginationData) GetDescription() string {
 		return x.Description
 	}
 	return ""
+}
+
+func (x *RunnerPaginationData) GetInitialFiles() []*File {
+	if x != nil {
+		return x.InitialFiles
+	}
+	return nil
 }
 
 type GetRunnersPaginationRequest struct {
@@ -653,14 +661,15 @@ var File_config_v1_runners_proto protoreflect.FileDescriptor
 
 const file_config_v1_runners_proto_rawDesc = "" +
 	"\n" +
-	"\x17config/v1/runners.proto\x12\tconfig.v1\x1a\x1aconfig/v1/pagination.proto\x1a\x14config/v1/file.proto\"\x9e\x01\n" +
+	"\x17config/v1/runners.proto\x12\tconfig.v1\x1a\x1aconfig/v1/pagination.proto\x1a\x14config/v1/file.proto\"\xd4\x01\n" +
 	"\x14RunnerPaginationData\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
 	"\fbuild_script\x18\x03 \x01(\tR\vbuildScript\x12\x1d\n" +
 	"\n" +
 	"run_script\x18\x04 \x01(\tR\trunScript\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\"\x84\x01\n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x124\n" +
+	"\rinitial_files\x18\x06 \x03(\v2\x0f.config.v1.FileR\finitialFiles\"\x84\x01\n" +
 	"\x1bGetRunnersPaginationRequest\x12<\n" +
 	"\n" +
 	"pagination\x18\x01 \x01(\v2\x1c.config.v1.PaginationRequestR\n" +
@@ -731,20 +740,21 @@ var file_config_v1_runners_proto_goTypes = []any{
 	(*CreateRunnerResponse)(nil),         // 8: config.v1.CreateRunnerResponse
 	(*UpdateRunnerRequest)(nil),          // 9: config.v1.UpdateRunnerRequest
 	(*DeleteRunnerRequest)(nil),          // 10: config.v1.DeleteRunnerRequest
-	(*PaginationRequest)(nil),            // 11: config.v1.PaginationRequest
-	(*File)(nil),                         // 12: config.v1.File
+	(*File)(nil),                         // 11: config.v1.File
+	(*PaginationRequest)(nil),            // 12: config.v1.PaginationRequest
 }
 var file_config_v1_runners_proto_depIdxs = []int32{
-	11, // 0: config.v1.GetRunnersPaginationRequest.pagination:type_name -> config.v1.PaginationRequest
-	0,  // 1: config.v1.GetRunnersPaginationResponse.runners:type_name -> config.v1.RunnerPaginationData
-	6,  // 2: config.v1.GetAllRunnersResponse.runners:type_name -> config.v1.RunnerResponse
-	12, // 3: config.v1.RunnerResponse.initial_files:type_name -> config.v1.File
-	12, // 4: config.v1.UpdateRunnerRequest.initial_files:type_name -> config.v1.File
-	5,  // [5:5] is the sub-list for method output_type
-	5,  // [5:5] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	11, // 0: config.v1.RunnerPaginationData.initial_files:type_name -> config.v1.File
+	12, // 1: config.v1.GetRunnersPaginationRequest.pagination:type_name -> config.v1.PaginationRequest
+	0,  // 2: config.v1.GetRunnersPaginationResponse.runners:type_name -> config.v1.RunnerPaginationData
+	6,  // 3: config.v1.GetAllRunnersResponse.runners:type_name -> config.v1.RunnerResponse
+	11, // 4: config.v1.RunnerResponse.initial_files:type_name -> config.v1.File
+	11, // 5: config.v1.UpdateRunnerRequest.initial_files:type_name -> config.v1.File
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_config_v1_runners_proto_init() }
