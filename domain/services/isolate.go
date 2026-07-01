@@ -66,6 +66,12 @@ func (s *IsolateService) NewRunInstance() *IsolateInstance {
 	return &instance
 }
 
+// GradePoolSize returns the number of grade sandbox boxes available. Used to
+// bound grade fan-out so waiting goroutines never exceed usable sandboxes.
+func (s *IsolateService) GradePoolSize() int {
+	return cap(s.gradeBoxIds)
+}
+
 func (s *IsolateService) NewGradeInstance() *IsolateInstance {
 	boxID := <-s.gradeBoxIds
 

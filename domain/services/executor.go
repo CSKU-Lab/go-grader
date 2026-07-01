@@ -14,6 +14,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// gradeGroupConcurrency bounds how many test-case groups grade in parallel.
+// Without a cap, grade fanned out unbounded goroutines (groups x test cases),
+// each pinning file/output buffers in the heap -> OOMKill. Test-case fan-out
+// within a group is separately bounded to the grade sandbox pool size.
+const gradeGroupConcurrency = 4
+
 type executorService struct {
 	isolateService *IsolateService
 	runnerService  *RunnerService
@@ -209,6 +215,7 @@ func (r *executor) Grade(ctx context.Context) (*models.GradeResult, error) {
 	testCaseGroupResults := make([]models.TestCaseGroupResult, 0, len(r.testCaseGroups))
 	var mu sync.Mutex
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(gradeGroupConcurrency)
 	for _, tcg := range r.testCaseGroups {
 		eg.Go(func() error {
 			tcgRunner := &testcaseGroupRunner{
@@ -290,6 +297,9 @@ func (t *testcaseGroupRunner) Result(ctx context.Context) (*models.TestCaseGroup
 
 	var mu sync.Mutex
 	eg, ctx := errgroup.WithContext(ctx)
+	// Bound test-case fan-out to the grade sandbox pool; extra goroutines would
+	// only block on <-gradeBoxIds while holding test-case buffers in memory.
+	eg.SetLimit(t.isolateService.GradePoolSize())
 	for _, tc := range t.tcs {
 		eg.Go(func() error {
 			result, err := t.GetTestCaseResult(ctx, &tc)
