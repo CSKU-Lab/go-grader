@@ -1,3 +1,10 @@
+## [0.7.3](https://github.com/CSKU-Lab/go-grader/compare/v0.7.2...v0.7.3) (2026-07-01)
+
+
+### Bug Fixes
+
+* **worker:** recreate broadcast queue on reconnect to stop 404 spin ([dd82629](https://github.com/CSKU-Lab/go-grader/commit/dd826296dd47472e27d62689ccfae2b6275ff13c))
+
 ## [0.7.2](https://github.com/CSKU-Lab/go-grader/compare/v0.7.1...v0.7.2) (2026-07-01)
 
 
