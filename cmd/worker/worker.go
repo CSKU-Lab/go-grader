@@ -129,10 +129,6 @@ func main() {
 	if err = q.DeclareExchange(ctx, "broadcast", "fanout", true); err != nil {
 		logger.Fatalw("Cannot declare broadcast fanout exchange", "error", err)
 	}
-	broadcastQueue, err := q.CreateBoundQueue(ctx, "broadcast")
-	if err != nil {
-		logger.Fatalw("Cannot setup broadcast fanout queue", "error", err)
-	}
 
 	setup.Init(logger, runners, compares)
 
@@ -154,7 +150,22 @@ func main() {
 
 	wg.Go(func() {
 		for {
-			err := q.Consume(ctx, broadcastQueue, 1, true, func(d *queue.Derivery, exit chan struct{}) error {
+			// The bound queue is server-named and auto-delete: once this
+			// consumer drops (handler error or channel blip) RabbitMQ deletes
+			// it, and reusing the stale name yields a permanent 404 spin loop.
+			// Re-declare a fresh bound queue on every (re)connect.
+			broadcastQueue, err := q.CreateBoundQueue(ctx, "broadcast")
+			if err != nil {
+				logger.Errorw("Cannot setup broadcast queue, retrying", "error", err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(2 * time.Second):
+				}
+				continue
+			}
+
+			err = q.Consume(ctx, broadcastQueue, 1, true, func(d *queue.Derivery, exit chan struct{}) error {
 				var action broadcast.Action
 
 				if err := json.Unmarshal(d.Body, &action); err != nil {
