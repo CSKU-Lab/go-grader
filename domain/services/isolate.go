@@ -15,6 +15,32 @@ import (
 	"go.uber.org/zap"
 )
 
+// limitedBuffer captures up to max bytes and silently discards the rest. Write
+// always reports the full length so it never blocks the process writing to it
+// (a blocked stdout pipe would hang a runaway program instead of letting its
+// limits kill it). truncated records whether any output was dropped.
+type limitedBuffer struct {
+	max       int
+	buf       []byte
+	truncated bool
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	if remaining := b.max - len(b.buf); remaining > 0 {
+		if len(p) <= remaining {
+			b.buf = append(b.buf, p...)
+		} else {
+			b.buf = append(b.buf, p[:remaining]...)
+			b.truncated = true
+		}
+	} else if len(p) > 0 {
+		b.truncated = true
+	}
+	return len(p), nil
+}
+
+func (b *limitedBuffer) String() string { return string(b.buf) }
+
 type IsolateService struct {
 	runBoxIds   chan int
 	gradeBoxIds chan int
@@ -95,30 +121,51 @@ func (i *IsolateInstance) logFatalf(format string, args ...any) {
 	i.logger.Fatalf("[Instance:%d] :: %s", i.boxID, fmt.Sprintf(format, args...))
 }
 
+// maxIsolateOutputBytes caps how much program output we buffer in the worker.
+// isolate 2.0 on cgroup v2 only enforces --time/--wall-time/--mem/--fsize when
+// --cg is set (see isolateGlobalArgs); before those limits kill a runaway
+// program it can still emit a burst of stdout. cmd.Output() would buffer all of
+// it in memory and OOM the worker, so we cap the capture. 16 MiB is far above
+// any legitimate program output and well under the pod memory limit.
+const maxIsolateOutputBytes = 16 << 20
+
+// isolateGlobalArgs are prepended to every isolate invocation for a box.
+//
+// NOTE: no --cg. isolate's wall-time limit already kills a runaway program
+// (including one forked from run_script.sh) without control groups — verified
+// against isolate 2.0 in this image. --cg additionally requires a delegated
+// cgroup subtree (/run/isolate/cgroup) that is not set up in the worker pod, so
+// enabling it here breaks isolate entirely. Proper --cg support (needed only for
+// per-cgroup CPU-time accounting of multi-process programs) is tracked
+// separately as an infra change.
+func (i *IsolateInstance) isolateGlobalArgs() []string {
+	return []string{fmt.Sprintf("--box-id=%d", i.boxID)}
+}
+
 func (i *IsolateInstance) execute(ctx context.Context, args ...string) (string, error) {
-	boxID := fmt.Sprintf("--box-id=%d", i.boxID)
-	cmd := exec.CommandContext(ctx, "isolate", append([]string{boxID}, args...)...)
+	cmd := exec.CommandContext(ctx, "isolate", append(i.isolateGlobalArgs(), args...)...)
 
-	output, err := cmd.Output()
-	if err != nil {
-		return string(output), err
-	}
+	out := &limitedBuffer{max: maxIsolateOutputBytes}
+	cmd.Stdout = out
+	// isolate is invoked with --stderr-to-stdout for program runs, but capture
+	// stderr too so isolate's own diagnostics surface on error.
+	cmd.Stderr = out
 
-	return string(output), nil
+	err := cmd.Run()
+	return out.String(), err
 }
 
 func (i *IsolateInstance) executeWithInput(ctx context.Context, input string, args ...string) (string, error) {
-	boxID := fmt.Sprintf("--box-id=%d", i.boxID)
-	cmd := exec.CommandContext(ctx, "isolate", append([]string{boxID}, args...)...)
+	cmd := exec.CommandContext(ctx, "isolate", append(i.isolateGlobalArgs(), args...)...)
 
 	cmd.Stdin = strings.NewReader(input)
 
-	output, err := cmd.Output()
-	if err != nil {
-		return string(output), err
-	}
+	out := &limitedBuffer{max: maxIsolateOutputBytes}
+	cmd.Stdout = out
+	cmd.Stderr = out
 
-	return string(output), nil
+	err := cmd.Run()
+	return out.String(), err
 }
 
 func (i *IsolateInstance) Init(ctx context.Context) {
