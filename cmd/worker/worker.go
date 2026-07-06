@@ -30,6 +30,49 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// maxGradeResultBytes bounds the marshaled grade result published to the reply
+// queue. RabbitMQ enforces max_message_size (16 MiB here); a grade with many
+// test cases each carrying up-to-10KB output can exceed it, the publish is
+// rejected, and the submission is stranded in RUNNING. Kept safely under the
+// broker limit.
+const maxGradeResultBytes = 8 << 20
+
+// marshalBoundedGradeResult marshals result, and if it exceeds
+// maxGradeResultBytes progressively strips the display-only per-test-case detail
+// (output/input/message, then the groups entirely) so the terminal status,
+// score and averages always publish. The status is what unblocks the submission;
+// the heavy detail is best-effort.
+func marshalBoundedGradeResult(result *models.GradeResult, logger *zap.SugaredLogger) []byte {
+	if b, err := json.Marshal(result); err == nil && len(b) <= maxGradeResultBytes {
+		return b
+	}
+
+	logger.Warnw("Grade result exceeds broker message limit, stripping detail",
+		"status", result.Status, "groups", len(result.TestCaseGroupResults))
+
+	for gi := range result.TestCaseGroupResults {
+		for ri := range result.TestCaseGroupResults[gi].Results {
+			r := &result.TestCaseGroupResults[gi].Results[ri]
+			r.Output = ""
+			r.Input = ""
+			r.Message = ""
+		}
+	}
+	if b, err := json.Marshal(result); err == nil && len(b) <= maxGradeResultBytes {
+		return b
+	}
+
+	// Still too big (huge number of test cases) — keep only the summary.
+	summary := &models.GradeResult{
+		Status:      result.Status,
+		AvgWallTime: result.AvgWallTime,
+		AvgMemory:   result.AvgMemory,
+		Score:       result.Score,
+	}
+	b, _ := json.Marshal(summary)
+	return b
+}
+
 func main() {
 	logger, loggerCleanup, err := logging.New(os.Getenv("ENV"))
 	if err != nil {
@@ -461,17 +504,17 @@ func main() {
 					return nil
 				}
 
-				bytesResult, err = json.Marshal(result)
-				if err != nil {
-					logger.Errorw("Cannot marshal run result", "error", err)
-				}
+				// Bound the result to the broker message limit so the terminal
+				// status always publishes — an oversized result would be rejected
+				// and strand the submission in RUNNING.
+				bytesResult = marshalBoundedGradeResult(result, logger)
 
 				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 					CorrelationID: payload.ID,
 					Body:          bytesResult,
 				})
 				if err != nil {
-					logger.Errorw("Cannot publish run result to the queue", "error", err)
+					logger.Errorw("Cannot publish grade result to the queue", "error", err)
 				}
 
 				logger.Info("Runner finished")
