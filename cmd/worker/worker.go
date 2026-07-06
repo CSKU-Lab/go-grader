@@ -37,6 +37,10 @@ import (
 // broker limit.
 const maxGradeResultBytes = 8 << 20
 
+// brokerMaxMessageBytes mirrors RabbitMQ's max_message_size (16 MiB). A result
+// message above this is rejected on publish, so we log when we approach it.
+const brokerMaxMessageBytes = 16 << 20
+
 // marshalBoundedGradeResult marshals result, and if it exceeds
 // maxGradeResultBytes progressively strips the display-only per-test-case detail
 // (output/input/message, then the groups entirely) so the terminal status,
@@ -373,12 +377,22 @@ func main() {
 					logger.Errorw("Cannot marshal run result", "error", err)
 				}
 
+				// Log the result message size — a run/generate result larger than
+				// the broker's max_message_size is rejected on publish and the
+				// caller (playground/generate) never gets a reply.
+				if len(bytesResult) > brokerMaxMessageBytes {
+					logger.Warnw("Run result exceeds broker message limit",
+						"id", payload.ID, "bytes", len(bytesResult), "limit", brokerMaxMessageBytes)
+				} else {
+					logger.Infow("Publishing run result", "id", payload.ID, "bytes", len(bytesResult))
+				}
+
 				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 					CorrelationID: payload.ID,
 					Body:          bytesResult,
 				})
 				if err != nil {
-					logger.Errorw("Cannot publish run result to the queue", "error", err)
+					logger.Errorw("Cannot publish run result to the queue", "error", err, "bytes", len(bytesResult))
 				}
 
 				logger.Infow("Runner finished", "result", result)
@@ -508,13 +522,14 @@ func main() {
 				// status always publishes — an oversized result would be rejected
 				// and strand the submission in RUNNING.
 				bytesResult = marshalBoundedGradeResult(result, logger)
+				logger.Infow("Publishing grade result", "id", payload.ID, "bytes", len(bytesResult))
 
 				err = q.Publish(ctx, "", derivery.ReplyTo, &queue.Derivery{
 					CorrelationID: payload.ID,
 					Body:          bytesResult,
 				})
 				if err != nil {
-					logger.Errorw("Cannot publish grade result to the queue", "error", err)
+					logger.Errorw("Cannot publish grade result to the queue", "error", err, "bytes", len(bytesResult))
 				}
 
 				logger.Info("Runner finished")
