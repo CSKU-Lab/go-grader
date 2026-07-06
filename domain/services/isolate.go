@@ -142,30 +142,35 @@ func (i *IsolateInstance) isolateGlobalArgs() []string {
 	return []string{fmt.Sprintf("--box-id=%d", i.boxID)}
 }
 
-func (i *IsolateInstance) execute(ctx context.Context, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "isolate", append(i.isolateGlobalArgs(), args...)...)
-
-	out := &limitedBuffer{max: maxIsolateOutputBytes}
-	cmd.Stdout = out
-	// isolate is invoked with --stderr-to-stdout for program runs, but capture
-	// stderr too so isolate's own diagnostics surface on error.
-	cmd.Stderr = out
+// run executes isolate and returns ONLY its stdout (the program output used for
+// comparison). isolate writes its own diagnostics — including the
+// "(0.008 sec real, 0.008 sec wall)" summary line — to stderr; that must NOT be
+// merged into the returned output or it pollutes the compare and flips passing
+// submissions to wrong. stderr is captured separately and surfaced only in the
+// error. Program stderr is already folded into stdout by isolate's
+// --stderr-to-stdout on program runs.
+func (i *IsolateInstance) run(cmd *exec.Cmd) (string, error) {
+	stdout := &limitedBuffer{max: maxIsolateOutputBytes}
+	stderr := &limitedBuffer{max: 64 << 10}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	err := cmd.Run()
-	return out.String(), err
+	if err != nil && stderr.String() != "" {
+		err = fmt.Errorf("%w: %s", err, stderr.String())
+	}
+	return stdout.String(), err
+}
+
+func (i *IsolateInstance) execute(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "isolate", append(i.isolateGlobalArgs(), args...)...)
+	return i.run(cmd)
 }
 
 func (i *IsolateInstance) executeWithInput(ctx context.Context, input string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "isolate", append(i.isolateGlobalArgs(), args...)...)
-
 	cmd.Stdin = strings.NewReader(input)
-
-	out := &limitedBuffer{max: maxIsolateOutputBytes}
-	cmd.Stdout = out
-	cmd.Stderr = out
-
-	err := cmd.Run()
-	return out.String(), err
+	return i.run(cmd)
 }
 
 func (i *IsolateInstance) Init(ctx context.Context) {
