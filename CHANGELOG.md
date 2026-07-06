@@ -1,3 +1,10 @@
+## [0.7.5](https://github.com/CSKU-Lab/go-grader/compare/v0.7.4...v0.7.5) (2026-07-06)
+
+
+### Bug Fixes
+
+* **worker:** cap retained grade output per test case to stop OOM ([37209d1](https://github.com/CSKU-Lab/go-grader/commit/37209d16c2bd88f4fe8cd7f316bd5ce9e447e699))
+
 ## [0.7.4](https://github.com/CSKU-Lab/go-grader/compare/v0.7.3...v0.7.4) (2026-07-06)
 
 
