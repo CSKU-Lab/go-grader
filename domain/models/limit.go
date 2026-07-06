@@ -23,10 +23,14 @@ type Limit struct {
 }
 
 // System maximum safe limits applied when a field is zero or negative.
+// These are DEFAULTS for tasks with no explicit limit; a configured task limit
+// still overrides them. Wall-time is the effective hard timeout — isolate's CPU
+// --time only accounts the directly-run process, so a forked runaway is bounded
+// by --wall-time. Lowered from 15s/10s to 5s to fail runaway submissions fast.
 const (
-	SafeCPUTime      float32 = 10
+	SafeCPUTime      float32 = 5
 	SafeCPUExtraTime float32 = 3
-	SafeWallTime     float32 = 15
+	SafeWallTime     float32 = 5
 	SafeMemory       int32   = 524288
 	SafeStack        int32   = 262144
 	SafeMaxOpenFiles int32   = 10
