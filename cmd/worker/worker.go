@@ -377,12 +377,18 @@ func main() {
 					logger.Errorw("Cannot marshal run result", "error", err)
 				}
 
-				// Log the result message size — a run/generate result larger than
-				// the broker's max_message_size is rejected on publish and the
-				// caller (playground/generate) never gets a reply.
+				// A run/generate result larger than the broker's max_message_size
+				// is rejected on publish, leaving the caller (playground/generate)
+				// hanging with no reply. Detect it and publish a small terminal
+				// error result instead so the caller always gets a response.
 				if len(bytesResult) > brokerMaxMessageBytes {
-					logger.Warnw("Run result exceeds broker message limit",
+					logger.Warnw("Run result exceeds broker message limit, sending error result",
 						"id", payload.ID, "bytes", len(bytesResult), "limit", brokerMaxMessageBytes)
+					bytesResult, _ = json.Marshal(models.RunResult{
+						ID:     payload.ID,
+						Status: execution.GRADER_ERROR,
+						Output: "[result too large to return]",
+					})
 				} else {
 					logger.Infow("Publishing run result", "id", payload.ID, "bytes", len(bytesResult))
 				}
