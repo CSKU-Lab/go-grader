@@ -1,3 +1,10 @@
+## [0.7.6](https://github.com/CSKU-Lab/go-grader/compare/v0.7.5...v0.7.6) (2026-07-06)
+
+
+### Bug Fixes
+
+* **worker:** do not merge isolate stderr into program output ([81755f5](https://github.com/CSKU-Lab/go-grader/commit/81755f50b23293d6f23571ba19807aff1eb107b7))
+
 ## [0.7.5](https://github.com/CSKU-Lab/go-grader/compare/v0.7.4...v0.7.5) (2026-07-06)
 
 
