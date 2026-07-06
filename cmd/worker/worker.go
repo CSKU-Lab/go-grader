@@ -253,12 +253,23 @@ func main() {
 
 				logger.Infow("Received run request", "payload", payload.RunnerID)
 
+				// Enforce safe limits (same as the grade path): a run/generate
+				// request with a nil or non-positive wall-time would otherwise run
+				// unbounded, hang the handler, and never free its sandbox box —
+				// wedging the pod's whole run path. WithSafeLimits fills any <= 0
+				// field with a default.
+				rawLimit := models.Limit{}
+				if payload.Limit != nil {
+					rawLimit = *payload.Limit
+				}
+				safeLimit := rawLimit.WithSafeLimits()
+
 				exService := *executorHolder.Get()
 				executor, err := exService.NewExecutor().
 					RunnerID(payload.RunnerID).
 					Files(payload.Files).
 					Input(payload.Input).
-					Limits(payload.Limit).
+					Limits(&safeLimit).
 					Build()
 
 				if err != nil {
