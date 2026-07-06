@@ -1,3 +1,10 @@
+## [0.7.7](https://github.com/CSKU-Lab/go-grader/compare/v0.7.6...v0.7.7) (2026-07-06)
+
+
+### Bug Fixes
+
+* **worker:** bound grade result to broker message limit ([fa23ecb](https://github.com/CSKU-Lab/go-grader/commit/fa23ecb1f43aa3dc7e6ff9b782c72cd7506f12e8))
+
 ## [0.7.6](https://github.com/CSKU-Lab/go-grader/compare/v0.7.5...v0.7.6) (2026-07-06)
 
 
