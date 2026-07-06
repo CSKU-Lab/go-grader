@@ -20,6 +20,23 @@ import (
 // within a group is separately bounded to the grade sandbox pool size.
 const gradeGroupConcurrency = 4
 
+// maxTestCaseOutputBytes bounds how much program output is RETAINED per test
+// case in the grade result. The per-exec capture cap (limitedBuffer, 16 MiB)
+// stops a single run from OOMing, but a grade aggregates one TestCaseResult per
+// test case across every group and then JSON-marshals + publishes the whole
+// GradeResult. A runaway printing submission with many test cases would hold
+// N x 16 MiB at once -> OOMKill. Grading only needs the compare verdict, so the
+// retained output is truncated to a small display size.
+const maxTestCaseOutputBytes = 10000
+
+// truncateOutput caps s to maxTestCaseOutputBytes, appending a marker when cut.
+func truncateOutput(s string) string {
+	if len(s) <= maxTestCaseOutputBytes {
+		return s
+	}
+	return s[:maxTestCaseOutputBytes] + "\n...[output truncated]"
+}
+
 type executorService struct {
 	isolateService *IsolateService
 	runnerService  *RunnerService
@@ -192,8 +209,10 @@ func (r *executor) Run(ctx context.Context) (*models.RunResult, error) {
 	runResult := &models.RunResult{
 		WallTime: metadata.WallTime,
 		Memory:   metadata.Memory,
-		Output:   output,
-		Status:   execution.RUN_PASSED,
+		// NOT truncated: generate-test-cases uses this output as the expected
+		// answer, so it must stay whole. Bounded by the 16 MiB capture cap.
+		Output: output,
+		Status: execution.RUN_PASSED,
 	}
 
 	return runResult, nil
@@ -368,7 +387,7 @@ func (t *testcaseGroupRunner) GetTestCaseResult(ctx context.Context, tc *models.
 		ID:       tc.ID,
 		Status:   status,
 		Input:    tc.Input,
-		Output:   output,
+		Output:   truncateOutput(output),
 		Message:  message,
 		WallTime: metadata.walltime,
 		Memory:   metadata.memory,
