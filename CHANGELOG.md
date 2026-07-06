@@ -1,3 +1,11 @@
+## [0.7.4](https://github.com/CSKU-Lab/go-grader/compare/v0.7.3...v0.7.4) (2026-07-06)
+
+
+### Bug Fixes
+
+* **worker:** cap isolate output capture to stop OOM crash cascade ([aa92b96](https://github.com/CSKU-Lab/go-grader/commit/aa92b96f5d5912305058827d73bcf90da0b4614d))
+* **worker:** enforce safe limits on run/generate path (CS-234) ([a3f80e9](https://github.com/CSKU-Lab/go-grader/commit/a3f80e954f8c9a4cd3e3b680d2960d5be5dda27e))
+
 ## [0.7.3](https://github.com/CSKU-Lab/go-grader/compare/v0.7.2...v0.7.3) (2026-07-01)
 
 
