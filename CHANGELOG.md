@@ -1,3 +1,10 @@
+## [0.7.8](https://github.com/CSKU-Lab/go-grader/compare/v0.7.7...v0.7.8) (2026-07-06)
+
+
+### Bug Fixes
+
+* **worker:** send error result when run result exceeds broker message limit ([e98a480](https://github.com/CSKU-Lab/go-grader/commit/e98a480ff2d0b41bc52cea7ac935187732c827ee))
+
 ## [0.7.7](https://github.com/CSKU-Lab/go-grader/compare/v0.7.6...v0.7.7) (2026-07-06)
 
 
