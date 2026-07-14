@@ -15,8 +15,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ vars.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.LABBY_ISOLATE_APP_ID }}
+          private-key: ${{ secrets.LABBY_ISOLATE_PRIVATE_KEY }}
           owner: CSKU-Lab
           repositories: go-grader
       - name: Checkout
@@ -31,8 +31,8 @@ jobs:
             docker/isolate-test/Dockerfile
       - name: Commit and push
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "labby_isolate[bot]"
+          git config user.email "labby_isolate[bot]@users.noreply.github.com"
           git add docker/worker/Dockerfile docker/worker/Dockerfile.dev docker/isolate-test/Dockerfile
           git diff --cached --quiet || git commit -m "fix: update isolate-with-compilers base image to ${{ inputs.base_image_tag }}"
           git push
