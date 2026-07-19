@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       base_image_tag:
-        description: 'isolate-with-compilers image tag (e.g. v1.2.3)'
+        description: 'isolate-with-compilers image tag, with or without v prefix (e.g. 1.2.3 or v1.2.3)'
         required: true
 
 jobs:
@@ -23,9 +23,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ steps.app-token.outputs.token }}
+      - name: Normalize tag (strip leading v)
+        env:
+          RAW_TAG: ${{ inputs.base_image_tag }}
+        run: echo "TAG=${RAW_TAG#v}" >> "$GITHUB_ENV"
       - name: Update base image tag in Dockerfiles
         run: |
-          sed -i "s|FROM cskulab/isolate-with-compilers.*|FROM cskulab/isolate-with-compilers:${{ inputs.base_image_tag }}|g" \
+          sed -i "s|FROM cskulab/isolate-with-compilers.*|FROM cskulab/isolate-with-compilers:${TAG}|g" \
             docker/worker/Dockerfile \
             docker/worker/Dockerfile.dev \
             docker/isolate-test/Dockerfile
@@ -34,5 +38,5 @@ jobs:
           git config user.name "labby_isolate[bot]"
           git config user.email "labby_isolate[bot]@users.noreply.github.com"
           git add docker/worker/Dockerfile docker/worker/Dockerfile.dev docker/isolate-test/Dockerfile
-          git diff --cached --quiet || git commit -m "fix: update isolate-with-compilers base image to ${{ inputs.base_image_tag }}"
+          git diff --cached --quiet || git commit -m "fix: update isolate-with-compilers base image to ${TAG}"
           git push
