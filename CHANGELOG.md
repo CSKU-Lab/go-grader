@@ -1,3 +1,10 @@
+## [0.7.11](https://github.com/CSKU-Lab/go-grader/compare/v0.7.10...v0.7.11) (2026-07-19)
+
+
+### Bug Fixes
+
+* **ci:** normalize base image tag, strip leading v ([2b85496](https://github.com/CSKU-Lab/go-grader/commit/2b854964d153453c989f157870110d852ace5908))
+
 ## [0.7.10](https://github.com/CSKU-Lab/go-grader/compare/v0.7.9...v0.7.10) (2026-07-19)
 
 
