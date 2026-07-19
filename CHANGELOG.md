@@ -1,3 +1,10 @@
+## [0.7.12](https://github.com/CSKU-Lab/go-grader/compare/v0.7.11...v0.7.12) (2026-07-19)
+
+
+### Bug Fixes
+
+* **deps:** bump grpc, otel/sdk, x/net for security advisories ([144dde4](https://github.com/CSKU-Lab/go-grader/commit/144dde40b8f0426c710bb0eda6c7c31770b9afcc))
+
 ## [0.7.11](https://github.com/CSKU-Lab/go-grader/compare/v0.7.10...v0.7.11) (2026-07-19)
 
 
