@@ -1,5 +1,5 @@
 # Use an official Golang image as a base
-FROM cskulab/isolate-with-compilers:v1.1.1
+FROM cskulab/isolate-with-compilers:1.1.1
 
 # Install dependencies
 RUN apt-get update && apt-get install -y curl tar git

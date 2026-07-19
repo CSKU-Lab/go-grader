@@ -1,4 +1,4 @@
-FROM cskulab/isolate-with-compilers:v1.1.1
+FROM cskulab/isolate-with-compilers:1.1.1
 
 ARG TARGETARCH
 
