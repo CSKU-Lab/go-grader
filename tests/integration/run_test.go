@@ -12,7 +12,7 @@ func TestRunPassed(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("python_test").
 		Files([]models.File{
 			{
@@ -22,8 +22,8 @@ func TestRunPassed(t *testing.T) {
 		}).
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Run(context.Background())
@@ -38,7 +38,7 @@ func TestRunWithInput(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("python_test").
 		Files([]models.File{
 			{
@@ -49,8 +49,8 @@ func TestRunWithInput(t *testing.T) {
 		Input("Hello World").
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Run(context.Background())
@@ -70,7 +70,7 @@ func TestRunCompileFailed(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("cpp_test").
 		Files([]models.File{
 			{
@@ -80,8 +80,8 @@ func TestRunCompileFailed(t *testing.T) {
 		}).
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Run(context.Background())
@@ -101,7 +101,7 @@ func TestRunFailed(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("python_test").
 		Files([]models.File{
 			{
@@ -111,8 +111,8 @@ func TestRunFailed(t *testing.T) {
 		}).
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Run(context.Background())

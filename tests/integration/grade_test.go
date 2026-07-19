@@ -15,7 +15,7 @@ func TestGradeCompileError(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("cpp_test").
 		Files([]models.File{
 			{
@@ -40,8 +40,8 @@ func TestGradeCompileError(t *testing.T) {
 		}).
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Grade(context.Background())
@@ -78,7 +78,7 @@ func TestGradePassed(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("cpp_test").
 		Files([]models.File{
 			{
@@ -103,8 +103,8 @@ func TestGradePassed(t *testing.T) {
 		}).
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Grade(context.Background())
@@ -124,7 +124,7 @@ func TestGradeFailed(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("cpp_test").
 		Files([]models.File{
 			{
@@ -149,8 +149,8 @@ func TestGradeFailed(t *testing.T) {
 		}).
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Grade(context.Background())
@@ -181,7 +181,7 @@ func TestGradeMultipleRunners(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			executor, status := executorService.NewExecutor().
+			executor, err := executorService.NewExecutor().
 				RunnerID("cpp_test").
 				Files([]models.File{
 					{
@@ -206,12 +206,12 @@ func TestGradeMultipleRunners(t *testing.T) {
 				}).
 				Build()
 
-			if status != execution.BUILD_PASSED {
-				errChan <- errors.New("build failed: " + string(status))
+			if err != nil {
+				errChan <- errors.New("build failed: " + err.Error())
 				return
 			}
 
-			_, err := executor.Grade(context.Background())
+			_, err = executor.Grade(context.Background())
 			if err != nil {
 				errChan <- err
 			}
@@ -233,7 +233,7 @@ func TestGradeWithLimits(t *testing.T) {
 	executorService, cleanup := initTest(t)
 	defer cleanup()
 
-	executor, status := executorService.NewExecutor().
+	executor, err := executorService.NewExecutor().
 		RunnerID("python_test").
 		Files([]models.File{
 			{
@@ -257,8 +257,8 @@ time.sleep(50)`,
 		}).
 		Build()
 
-	if status != execution.BUILD_PASSED {
-		t.Fatalf("Build failed: %s", status)
+	if err != nil {
+		t.Fatalf("Build failed: %s", err)
 	}
 
 	result, err := executor.Grade(context.Background())
