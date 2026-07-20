@@ -1,3 +1,10 @@
+## [0.7.13](https://github.com/CSKU-Lab/go-grader/compare/v0.7.12...v0.7.13) (2026-07-20)
+
+
+### Bug Fixes
+
+* update isolate-with-compilers base image to 1.0.0 ([8682185](https://github.com/CSKU-Lab/go-grader/commit/8682185bd7f4ae0235562093c86010660f7d9494))
+
 ## [0.7.12](https://github.com/CSKU-Lab/go-grader/compare/v0.7.11...v0.7.12) (2026-07-19)
 
 
