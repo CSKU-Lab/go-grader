@@ -18,7 +18,7 @@ ENV GOOS=linux
 # Build the Go app
 RUN go build -o worker cmd/worker/worker.go
 
-FROM cskulab/isolate-with-compilers:1.1.1
+FROM cskulab/isolate-with-compilers:1.0.0
 
 # Copy the binary from the build container to the final container
 COPY --from=build /app/worker /app/worker
